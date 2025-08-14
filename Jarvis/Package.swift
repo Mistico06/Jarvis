@@ -18,9 +18,6 @@ let package = Package(
             name: "Jarvis",
             dependencies: [],
             path: "Sources/App",
-            resources: [
-                .process("Resources")
-            ]
         )
     ]
 )
