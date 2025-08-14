@@ -9,7 +9,6 @@ struct JarvisApp: App {
     @StateObject private var networkGuard = NetworkGuard.shared
     
     init() {
-        // Configure app for offline-first operation
         configureAppForOfflineFirst()
     }
     
@@ -27,25 +26,38 @@ struct JarvisApp: App {
     }
     
     private func configureAppForOfflineFirst() {
-        // Disable automatic network requests
+        // NOTE: This modifies the default config instance, which might be too late if sessions exist
+        // Consider creating custom URLSessionConfiguration and using it in your networking stack
         URLSessionConfiguration.default.allowsCellularAccess = false
         URLSessionConfiguration.default.allowsExpensiveNetworkAccess = false
     }
     
     private func requestPermissions() {
-        // Request microphone permission for on-device speech
-        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            DispatchQueue.main.async {
+                appState.microphonePermissionGranted = granted
+            }
+        }
         
-        // Request speech recognition permission with on-device requirement
-        SFSpeechRecognizer.requestAuthorization { _ in }
+        SFSpeechRecognizer.requestAuthorization { status in
+            DispatchQueue.main.async {
+                appState.speechRecognitionStatus = status
+            }
+        }
         
-        // Request camera permission for OCR
-        AVCaptureDevice.requestAccess(for: .video) { _ in }
+        AVCaptureDevice.requestAccess(for: .video) { granted in
+            DispatchQueue.main.async {
+                appState.cameraPermissionGranted = granted
+            }
+        }
     }
     
     private func initializeApp() {
         Task {
             await modelRuntime.initializeModels()
+            DispatchQueue.main.async {
+                appState.isModelLoaded = true
+            }
         }
     }
 }
@@ -56,6 +68,11 @@ class AppState: ObservableObject {
     @Published var currentMode: AppMode = .offline
     @Published var isNetworkActive = false
     @Published var selectedModel: ModelSize = .lite
+    
+    // Permissions tracking added for better state handling
+    @Published var microphonePermissionGranted: Bool = false
+    @Published var speechRecognitionStatus: SFSpeechRecognizerAuthorizationStatus = .notDetermined
+    @Published var cameraPermissionGranted: Bool = false
     
     enum AppMode {
         case offline, quickSearch, deepResearch
