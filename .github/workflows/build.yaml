@@ -30,16 +30,12 @@ jobs:
       - name: Build iOS package
         working-directory: Jarvis
         run: |
-          set -o pipefail
-          xcodebuild \
-            -workspace Jarvis.xcworkspace \
+          xcodebuild clean build \
+            -project Jarvis.xcodeproj \
             -scheme Jarvis \
-            -configuration Debug \
-            -destination 'generic/platform=iOS' \
-            clean build \
-            CODE_SIGNING_ALLOWED=NO \
-            ENABLE_BITCODE=NO \
-            | tee xcodebuild.log | xcbeautify || true
+            -destination "generic/platform=iOS" \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            CODE_SIGN_STYLE=Automatic
 
       - name: Upload xcodebuild log
         if: always()
