@@ -14,12 +14,12 @@ struct SettingsView: View {
                 // Model Selection
                 Section("AI Model") {
                     Picker("Model Size", selection: $appState.selectedModel) {
-                        Text("Lite (3B) - Faster").tag(AppState.ModelSize.lite)
-                        Text("Max (4B) - Smarter").tag(AppState.ModelSize.max)
+                        Text("Lite (3B) - Faster").tag(ModelRuntime.ModelSize.lite)
+                        Text("Max (4B) - Smarter").tag(ModelRuntime.ModelSize.max)
                     }
                     .onChange(of: appState.selectedModel) { newModel in
                         Task {
-                            await modelRuntime.loadModel(size: newModel == .lite ? .lite : .max)
+                            await modelRuntime.switchModel(to: newModel)
                         }
                     }
                     
