@@ -95,16 +95,12 @@ final class ModelRuntime: ObservableObject {
         // Tokenize prompt
         let inputs = try eng.tokenize(prompt)
 
-        // Generate with explicit callback parameter (avoids trailing-closure ambiguity)
-        let outputs = try await eng.generate(
-            inputs: inputs,
-            maxTokens: maxTokens,
-            callback: { tokens, _ in
-                Task { @MainActor in
-                    self.tokensPerSecond = eng.tokensPerSecond
-                }
+        // Generate with trailing-closure syntax
+        let outputs = try await eng.generate(inputs: inputs, maxTokens: maxTokens) { tokens, _ in
+            Task { @MainActor in
+                self.tokensPerSecond = eng.tokensPerSecond
             }
-        )
+        }
 
         // Detokenize output
         guard let text = try? eng.detokenize(outputs) else {
