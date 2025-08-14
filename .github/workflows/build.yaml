@@ -1,0 +1,49 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Set up Xcode 16.2
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
+      - name: List available schemes
+        working-directory: Jarvis
+        run: xcodebuild -list
+
+      - name: Build iOS package
+        working-directory: Jarvis
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace Jarvis.xcworkspace \
+            -scheme Jarvis \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            clean build \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO \
+            | tee xcodebuild.log | xcbeautify || true
+
+      - name: Upload xcodebuild log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: xcodebuild-log
+          path: Jarvis/xcodebuild.log
