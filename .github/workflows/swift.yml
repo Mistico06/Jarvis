@@ -1,4 +1,4 @@
-# This workflow will build a Swift project
+# This workflow will build and test a Swift project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
 
 name: Swift
@@ -6,7 +6,6 @@ name: Swift
 on:
   push:
     branches: [ "main" ]
-    
   workflow_dispatch:
 
 jobs:
@@ -33,6 +32,20 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Cache Swift packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            Jarvis/.build
+            Jarvis/Packages
+          key: ${{ runner.os }}-swift-${{ hashFiles('Jarvis/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-
+
       - name: Build the package
         working-directory: Jarvis
         run: swift build -v
+
+      - name: Run tests
+        working-directory: Jarvis
+        run: swift test -v
