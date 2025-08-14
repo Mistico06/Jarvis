@@ -1,9 +1,8 @@
-// AudioEngine.swift
 import Foundation
 import os.log
+import AVFoundation
 #if os(iOS)
 import Speech
-import AVFoundation
 #endif
 
 @MainActor
@@ -12,11 +11,10 @@ class AudioEngine: NSObject, ObservableObject {
     @Published var transcriptionText = ""
 
     #if os(iOS)
-    private var audioEngine = AVAudioEngine()
-    private var speechRecognizer: SFSpeechRecognizer?
+    private let audioEngine = AVAudioEngine()
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale.current)
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private var inputNode: AVAudioInputNode?
     private let speechSynthesizer = AVSpeechSynthesizer()
     #endif
 
@@ -25,34 +23,76 @@ class AudioEngine: NSObject, ObservableObject {
     override init() {
         super.init()
         #if os(iOS)
-        setupSpeechRecognizer()
         speechSynthesizer.delegate = self
+        SFSpeechRecognizer.requestAuthorization { status in
+            switch status {
+            case .authorized: break
+            default:
+                self.logger.warning("Speech recognition not authorized: \(status.rawValue)")
+            }
+        }
         #endif
     }
 
     #if os(iOS)
-    private func setupSpeechRecognizer() {
-        speechRecognizer = SFSpeechRecognizer(locale: Locale.current)
-        speechRecognizer?.defaultTaskHint = .dictation
-        SFSpeechRecognizer.requestAuthorization { status in
-            // Handle authorization if needed
+    func startRecording(completion: @escaping (String) -> Void) {
+        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
+            logger.warning("Speech recognizer unavailable")
+            return
+        }
+
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let request = recognitionRequest else { return }
+
+        let inputNode = audioEngine.inputNode
+        request.shouldReportPartialResults = true
+
+        recognitionTask = recognizer.recognitionTask(with: request) { result, error in
+            if let result = result {
+                let text = result.bestTranscription.formattedString
+                DispatchQueue.main.async {
+                    self.transcriptionText = text
+                    completion(text)
+                }
+            }
+            if let error = error {
+                self.logger.error("Recognition error: \(error.localizedDescription)")
+                self.stopRecording()
+            }
+        }
+
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            request.append(buffer)
+        }
+
+        audioEngine.prepare()
+        do {
+            try audioEngine.start()
+            isRecording = true
+            logger.info("Started recording")
+        } catch {
+            logger.error("AudioEngine start error: \(error.localizedDescription)")
         }
     }
 
-    func startRecording(completion: @escaping (String) -> Void) {
-        // Your full startRecording implementation here...
-    }
-
     func stopRecording() {
-        // Your full stopRecording implementation here...
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine.stop()
+        recognitionRequest?.endAudio()
+        isRecording = false
+        logger.info("Stopped recording")
     }
 
     func speak(text: String) {
-        // Your full speak implementation here...
+        let utterance = AVSpeechUtterance(string: text)
+        speechSynthesizer.speak(utterance)
+        logger.info("Speaking text")
     }
 
     func stopSpeaking() {
-        // Your full stopSpeaking implementation here...
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        logger.info("Stopped speaking")
     }
     #else
     func startRecording(completion: @escaping (String) -> Void) {
@@ -72,6 +112,6 @@ class AudioEngine: NSObject, ObservableObject {
 
 #if os(iOS)
 extension AudioEngine: AVSpeechSynthesizerDelegate {
-    // Implement delegate methods if needed
+    // Add methods if you need callbacks for start/finish of speech
 }
 #endif

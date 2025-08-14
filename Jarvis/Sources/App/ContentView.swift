@@ -8,17 +8,9 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                // Background
-                Color(
-                    #if os(iOS)
-                    UIColor.systemBackground
-                    #elseif os(macOS)
-                    NSColor.windowBackgroundColor
-                    #else
-                    .white
-                    #endif
-                )
-                .ignoresSafeArea()
+                // ✅ Simplified since you only target iOS
+                Color(.systemBackground)
+                    .ignoresSafeArea()
 
                 // Main chat interface
                 ChatView()
@@ -55,3 +47,5 @@ struct ContentView: View {
                 SettingsView()
             }
         }
+    }
+}

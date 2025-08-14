@@ -1,25 +1,20 @@
 import SwiftUI
+import AVFoundation  // ✅ Remove conditional since you only target iOS
 
-#if os(iOS)
-import AVFoundation
-#endif
-
-@available(macOS 11.0, *)
-@main
+@main  // ✅ Remove @available since you only target iOS
 struct JarvisApp: App {
     @StateObject private var appState = AppState.shared
     @StateObject private var modelRuntime = ModelRuntime.shared
     @StateObject private var networkGuard = NetworkGuard.shared
 
     init() {
-        #if os(iOS)
+        // ✅ Remove #if os(iOS) since you only target iOS
         // Request microphone permission early
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             if !granted {
                 print("Microphone access denied.")
             }
         }
-        #endif
     }
 
     var body: some Scene {
@@ -28,6 +23,10 @@ struct JarvisApp: App {
                 .environmentObject(appState)
                 .environmentObject(modelRuntime)
                 .environmentObject(networkGuard)
+                .task {
+                    // ✅ Initialize models when app starts
+                    await modelRuntime.initializeModels()
+                }
         }
     }
 }

@@ -29,8 +29,8 @@ extension ModelRuntime.ModelSize {
         }
     }
 
-    var modelPath: String {
-        // This should match how you're saving/embedding MLC models
+    // ✅ Fixed: Now uses rawValue properly
+    var modelBundlePath: String {
         return "Models/\(self.rawValue)-q4_K_M.mlc"
     }
 }

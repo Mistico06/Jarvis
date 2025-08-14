@@ -1,4 +1,3 @@
-// VoiceControlView.swift
 import SwiftUI
 
 struct VoiceControlView: View {

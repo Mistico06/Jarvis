@@ -1,135 +1,107 @@
 import Foundation
-import MLCLLMSwift
 import Combine
 import Metal
 import os.log
+import MLCSwift
 
 @MainActor
-class ModelRuntime: ObservableObject {
+final class ModelRuntime: ObservableObject {
     static let shared = ModelRuntime()
 
+    // MARK: Published State
     @Published var isModelLoaded = false
     @Published var currentModel: ModelSize = .lite
     @Published var loadingProgress = 0.0
     @Published var tokensPerSecond = 0.0
 
+    // MARK: Private Properties
     private var engine: MLCEngine?
-    private var device: MTLDevice?
+    private let device: MTLDevice?
     private let logger = Logger(subsystem: "com.jarvis.model", category: "runtime")
 
-    enum ModelSize { case lite, max }
-    enum ModelError: Error { case notLoaded, failedToLoadModel }
-
-    private init() { setupMetal() }
-
-    private func setupMetal() {
-        device = MTLCreateSystemDefaultDevice()
-        guard let device = device else {
-            logger.error("Failed to create Metal device")
-            return
+    // MARK: Enums
+    enum ModelSize {
+        case lite, max
+        var modelPath: String {
+            switch self {
+            case .lite: return "qwen2.5-3b-instruct-q4_K_M"
+            case .max:  return "qwen2.5-4b-instruct-q4_K_M"
+            }
         }
-        logger.info("Metal initialized: \(device.name)")
+    }
+    enum ModelError: Error { case notLoaded, failedToLoad, invalidResponse }
+
+    // MARK: Init
+    private init() {
+        device = MTLCreateSystemDefaultDevice()
+        if let name = device?.name {
+            logger.info("Metal initialized: \(name)")
+        } else {
+            logger.error("Failed to create Metal device")
+        }
     }
 
+    // MARK: Public API
     func initializeModels() async {
         await loadModel(size: currentModel)
     }
 
-    func loadModel(size: ModelSize) async {
-        if isModelLoaded && currentModel == size { return }
+    func switchModel(to size: ModelSize) async {
+        guard size != currentModel || !isModelLoaded else { return }
+        await loadModel(size: size)
+    }
+
+    // MARK: Load
+    private func loadModel(size: ModelSize) async {
         isModelLoaded = false
         loadingProgress = 0.0
         currentModel = size
 
-        // TODO: Replace with actual model loading code and valid paths
         do {
-            // Example: load your model file URLs here
-            let modelURL = try modelURL(for: size)
+            loadingProgress = 0.3
+            var cfg = EngineConfig()
+            cfg.modelPath    = size.modelPath
+            cfg.modelLib     = "mlc-llm-libs/\(size.modelPath)"
+            cfg.deviceType   = .metal
+            cfg.maxNumSequence = 1
 
-            // Initialize MLCEngine with model path
-            engine = try MLCEngine(modelURL: modelURL)
+            loadingProgress = 0.6
+            engine = try MLCEngine(config: cfg)
+            loadingProgress = 0.9
+
+            // Test generation to verify model works
+            _ = try await generateText(prompt: "Hello", maxTokens: 5)
 
             loadingProgress = 1.0
             isModelLoaded = true
             logger.info("Model loaded: \(size)")
         } catch {
-            logger.error("Failed to load model: \(error.localizedDescription)")
+            logger.error("Load failed: \(error.localizedDescription)")
             isModelLoaded = false
         }
     }
 
-    func switchModel(to size: ModelSize) async {
-        if currentModel != size || !isModelLoaded {
-            await loadModel(size: size)
-        }
-    }
-
-    // Generates full text response (non-streaming)
-    func generateText(prompt: String, maxTokens: Int = 512, temperature: Float = 0.7, topP: Float = 0.9, topK: Int = 40) async throws -> String {
-        guard let engine = engine, isModelLoaded else { throw ModelError.notLoaded }
-        let start = CFAbsoluteTimeGetCurrent()
-
-        let request = ChatCompletionRequest()
-        request.messages = [ChatMessage(role: .user, content: prompt)]
-        request.maxTokens = maxTokens
-        request.temperature = temperature
-        request.topP = topP
-        request.topK = topK
-
-        let response = try await engine.generateChatCompletion(request: request)
-
-        let duration = CFAbsoluteTimeGetCurrent() - start
-        if duration > 0 {
-            tokensPerSecond = Double(maxTokens) / duration
+    // MARK: Inference
+    func generateText(prompt: String, maxTokens: Int) async throws -> String {
+        guard let eng = engine else {
+            throw ModelError.notLoaded
         }
 
-        return response.choices.first?.message.content ?? ""
-    }
+        // Tokenize prompt
+        let inputs = try eng.tokenize(prompt)
 
-    // Streaming token generation for real-time UI update
-    func generateTextStream(
-        prompt: String,
-        maxTokens: Int = 512,
-        temperature: Float = 0.7,
-        topP: Float = 0.9,
-        topK: Int = 40,
-        onToken: @escaping (String) -> Void
-    ) async throws {
-        guard let engine = engine, isModelLoaded else { throw ModelError.notLoaded }
-
-        let request = ChatCompletionRequest()
-        request.messages = [ChatMessage(role: .user, content: prompt)]
-        request.maxTokens = maxTokens
-        request.temperature = temperature
-        request.topP = topP
-        request.topK = topK
-
-        let start = CFAbsoluteTimeGetCurrent()
-
-        // This is a stub: Replace with actual streaming call if MLCLLMSwift supports it.
-        // For example, a delegate or async sequence yielding tokens.
-
-        // Pseudo code for streaming:
-        for token in try await engine.generateChatCompletionStream(request: request) {
-            onToken(token)
+        // Generate with callback to update token rate
+        let outputs = try await eng.generate(inputs: inputs,
+                                             maxTokens: maxTokens) { _, _ in
+            Task { @MainActor in
+                self.tokensPerSecond = eng.tokensPerSecond
+            }
         }
 
-        let duration = CFAbsoluteTimeGetCurrent() - start
-        if duration > 0 {
-            tokensPerSecond = Double(maxTokens) / duration
+        // Detokenize output
+        guard let text = try? eng.detokenize(outputs) else {
+            throw ModelError.invalidResponse
         }
-    }
-
-    // Helper to get model URL by size
-    private func modelURL(for size: ModelSize) throws -> URL {
-        // Adjust to your actual model storage location
-        let modelsBaseURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-
-        switch size {
-        case .lite:
-            return modelsBaseURL.appendingPathComponent("qwen2.5-3b-instruct-q4_K_M.gguf")
-        case .max:
-            return modelsBaseURL.appendingPathComponent("qwen2.5-4b-instruct-q4_K_M.gguf")
-        }
+        return text
     }
 }

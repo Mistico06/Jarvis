@@ -5,21 +5,19 @@ struct SettingsView: View {
     @EnvironmentObject private var modelRuntime: ModelRuntime
     @EnvironmentObject private var networkGuard: NetworkGuard
     @StateObject private var auditLog = AuditLog.shared
-    
+
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("AI Model") {
                     Picker("Model Size", selection: $appState.selectedModel) {
-                        Text("Lite (3B) - Faster").tag(ModelRuntime.ModelSize.lite)
-                        Text("Max (4B) - Smarter").tag(ModelRuntime.ModelSize.max)
+                        Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
+                        Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
                     }
                     .onChange(of: appState.selectedModel) { newModel in
-                        Task {
-                            await modelRuntime.switchModel(to: newModel)
-                        }
+                        Task { await modelRuntime.switchModel(to: newModel) }
                     }
 
                     if modelRuntime.isModelLoaded {
@@ -40,11 +38,11 @@ struct SettingsView: View {
                             .tag(AppState.AppMode.quickSearch)
                         Label("Deep Research", systemImage: "doc.text.magnifyingglass")
                             .tag(AppState.AppMode.deepResearch)
+                        Label("Voice Control", systemImage: "mic")
+                            .tag(AppState.AppMode.voiceControl)
                     }
                     .onChange(of: appState.currentMode) { newMode in
                         networkGuard.setNetworkMode(newMode)
-                        // If you track network activity state in appState, update it here:
-                        // appState.isNetworkActive = newMode != .offline
                     }
 
                     if appState.currentMode != .offline {
@@ -61,8 +59,8 @@ struct SettingsView: View {
                 Section("Privacy & Security") {
                     NavigationLink("Network Audit Log") {
                         NetworkAuditView()
+                            .environmentObject(auditLog)
                     }
-
                     Button("Clear All Data") {
                         clearAllData()
                     }
@@ -94,13 +92,13 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "N/A")
                             .foregroundColor(.secondary)
                     }
                     HStack {
                         Text("Build")
                         Spacer()
-                        Text("2024.08.14")
+                        Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "N/A")
                             .foregroundColor(.secondary)
                     }
                     HStack {
@@ -115,9 +113,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+                    Button("Done") { dismiss() }
                 }
             }
         }
@@ -130,9 +126,15 @@ struct SettingsView: View {
     }
 
     private func getModelStorageSize() -> String {
-        let modelPaths = [
-            modelRuntime.currentModel.modelPath
-        ]
-        var totalSize: Int64 = 0
-        for path in modelPaths {
-            if let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+        let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = docsURL.appendingPathComponent(modelRuntime.currentModel.modelBundlePath)
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+              let byteCount = attributes[.size] as? Int64 else {
+            return "0 MB"
+        }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: byteCount)
+    }
+}

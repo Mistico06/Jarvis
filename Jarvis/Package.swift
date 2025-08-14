@@ -10,9 +10,7 @@ let package = Package(
         .executable(name: "Jarvis", targets: ["Jarvis"])
     ],
     dependencies: [
-        // Local dependency: mlc-llm cloned in ThirdParty
         .package(path: "ThirdParty/mlc-llm/ios/MLCSwift"),
-        // Other dependencies
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0"..<"4.0.0"),
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.14.1")
     ],
@@ -20,7 +18,8 @@ let package = Package(
         .executableTarget(
             name: "Jarvis",
             dependencies: [
-                .product(name: "MLCSwift", package: "MLCSwift"),
+                // ✅ Change this line - use the actual package name from MLCSwift's Package.swift
+                .product(name: "MLCSwift", package: "mlc-llm"),  // Package name should match the target Package.swift
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "SQLite", package: "SQLite.swift")
             ],

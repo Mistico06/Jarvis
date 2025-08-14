@@ -7,18 +7,20 @@ import os.log
 @MainActor
 class ImageAnalyzer: ObservableObject {
     @Published var isProcessing = false
-    
+
     private let logger = Logger(subsystem: "com.jarvis.vision", category: "analyzer")
     private var classificationModel: VNCoreMLModel?
-    
+
     init() {
         setupClassificationModel()
     }
-    
+
     private func setupClassificationModel() {
-        guard let modelURL = Bundle.main.url(forResource: "MobileNetV2", withExtension: "mlmodelc"),
-              let model = try? MLModel(contentsOf: modelURL),
-              let visionModel = try? VNCoreMLModel(for: model) else {
+        guard
+            let modelURL = Bundle.main.url(forResource: "MobileNetV2", withExtension: "mlmodelc"),
+            let model = try? MLModel(contentsOf: modelURL),
+            let visionModel = try? VNCoreMLModel(for: model)
+        else {
             logger.warning("Classification model not available, using basic analysis")
             return
         }
@@ -45,7 +47,8 @@ class ImageAnalyzer: ObservableObject {
                 }
 
                 let recognizedStrings = request.results?.compactMap {
-                    ($0 as? VNRecognizedTextObservation)?.topCandidates(1).first?.string
+                    ($0 as? VNRecognizedTextObservation)?
+                        .topCandidates(1).first?.string
                 } ?? []
 
                 let fullText = recognizedStrings.joined(separator: " ")
@@ -68,8 +71,10 @@ class ImageAnalyzer: ObservableObject {
     }
 
     func classifyImage(_ image: UIImage) async -> String {
-        guard let classificationModel = classificationModel,
-              let cgImage = image.cgImage else {
+        guard
+            let classificationModel = classificationModel,
+            let cgImage = image.cgImage
+        else {
             return "Unable to classify image"
         }
 
@@ -81,8 +86,10 @@ class ImageAnalyzer: ObservableObject {
                     return
                 }
 
-                guard let results = request.results as? [VNClassificationObservation],
-                      let topResult = results.first else {
+                guard
+                    let results = request.results as? [VNClassificationObservation],
+                    let topResult = results.first
+                else {
                     continuation.resume(returning: "No classification results")
                     return
                 }
@@ -102,11 +109,11 @@ class ImageAnalyzer: ObservableObject {
             }
         }
     }
-    
+
     func analyzeImageContent(_ image: UIImage) async -> ImageAnalysisResult {
         async let ocrText = extractText(from: image)
         async let classification = classifyImage(image)
-        
+
         return ImageAnalysisResult(
             ocrText: await ocrText,
             classification: await classification,
