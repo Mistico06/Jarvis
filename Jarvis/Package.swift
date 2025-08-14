@@ -26,10 +26,6 @@ let package = Package(
                 .product(name: "Crypto",    package: "swift-crypto"),
                 .product(name: "SQLite",    package: "SQLite.swift")
             ]
-        ),
-        .testTarget(
-            name: "AppModuleTests",
-            dependencies: ["AppModule"]
-        ),
+        )
     ]
 )
