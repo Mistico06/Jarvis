@@ -3,10 +3,10 @@ import PackageDescription
 
 let package = Package(
     name: "Jarvis",
-    platforms: [
-        .macOS(.v10_15),
-        .iOS(.v16)
-    ],
+platforms: [
+    .macOS(.v11),
+    .iOS(.v16) // if targeting iOS
+]
     products: [
         .executable(name: "Jarvis", targets: ["Jarvis"]),
     ],
