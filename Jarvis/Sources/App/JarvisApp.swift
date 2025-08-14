@@ -31,34 +31,22 @@ struct JarvisApp: App {
                 }
         }
     }
-    
+
+    /// ✅ Combined version of permission requests with proper availability checks
+    private func requestPermissions() {
+        if #available(macOS 10.14, *) {
+            AVCaptureDevice.requestAccess(for: .video) { _ in }
+        }
+
+        if #available(macOS 10.15, *) {
+            SFSpeechRecognizer.requestAuthorization { _ in }
+        }
+
+        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+    }
+
     private func configureAppForOfflineFirst() {
         URLSessionConfiguration.default.allowsCellularAccess = false
         URLSessionConfiguration.default.allowsExpensiveNetworkAccess = false
-    }
-    
-    private func requestPermissions() {
-        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
-        SFSpeechRecognizer.requestAuthorization { _ in }
-        AVCaptureDevice.requestAccess(for: .video) { _ in }
-    }
-}
-
-@MainActor
-class AppState: ObservableObject {
-    @Published var isModelLoaded = false
-    @Published var currentMode: AppMode = .offline
-    @Published var isNetworkActive = false
-    
-    // UPDATED enum with Identifiable & CaseIterable for UI bindings
-    @Published var selectedModel: ModelSize = .lite
-    
-    enum AppMode {
-        case offline, quickSearch, deepResearch
-    }
-    
-    enum ModelSize: String, CaseIterable, Identifiable {
-        case lite, max
-        var id: String { rawValue }
     }
 }
