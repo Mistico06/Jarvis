@@ -23,12 +23,20 @@ let package = Package(
                 .product(name: "SQLite", package: "SQLite.swift")
             ],
             path: "Sources/App",
-            resources: [.process("Resources")]
+            sources: [
+                ".", // only files in Sources/App (not subdirectories unless you want them)
+            ],
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "JarvisTests",
             dependencies: ["App"],
-            path: "Tests/JarvisTests"
+            path: "Tests/JarvisTests",
+            sources: [
+                "." // only files directly in Tests/JarvisTests
+            ]
         )
     ]
 )
