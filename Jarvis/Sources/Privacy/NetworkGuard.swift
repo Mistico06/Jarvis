@@ -21,7 +21,7 @@ class NetworkGuard: ObservableObject {
     private func setupNetworkMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
-                self?.logger.info("Network path changed: \(path.status)")
+                self?.logger.info("Network path changed: \(path.status.description)")
             }
         }
         monitor.start(queue: queue)
@@ -35,15 +35,16 @@ class NetworkGuard: ObservableObject {
         case .offline:
             logger.info("Network access BLOCKED - Offline mode")
         case .quickSearch:
-            logger.info("Network access ALLOWED - Quick search mode")
+            logger.info("Network access ALLOWED - Quick Search mode")
         case .deepResearch:
-            logger.info("Network access ALLOWED - Deep research mode")
+            logger.info("Network access ALLOWED - Deep Research mode")
         }
         
         // Log mode change for audit
         AuditLog.shared.logNetworkModeChange(mode)
     }
     
+    /// Check if network access is allowed for a specific purpose.
     func requestNetworkAccess(for purpose: String) -> Bool {
         guard !isNetworkBlocked else {
             logger.warning("Network request DENIED for: \(purpose)")
@@ -57,10 +58,12 @@ class NetworkGuard: ObservableObject {
         return true
     }
     
+    /// Release a previously acquired network access.
     func releaseNetworkAccess() {
         activeConnections = max(0, activeConnections - 1)
     }
     
+    /// Emergency block all network access immediately.
     func blockAllNetworkAccess() {
         isNetworkBlocked = true
         currentMode = .offline
@@ -68,8 +71,9 @@ class NetworkGuard: ObservableObject {
     }
 }
 
-// Custom URLSession that respects NetworkGuard
+// Custom URLSession that respects NetworkGuard's network policies
 extension URLSession {
+    /// Returns a URLSession configured to respect NetworkGuard's access rules.
     static func jarvisSession() -> URLSession {
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = false
@@ -80,15 +84,29 @@ extension URLSession {
     }
 }
 
-class NetworkSessionDelegate: NSObject, URLSessionDelegate {
-    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+/// URLSessionDelegate that checks network access with NetworkGuard before performing requests.
+class NetworkSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, 
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         
         // Check with NetworkGuard before allowing connection
-        guard NetworkGuard.shared.requestNetworkAccess(for: challenge.protectionSpace.host) else {
+        let host = challenge.protectionSpace.host
+        guard NetworkGuard.shared.requestNetworkAccess(for: host) else {
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
         
         completionHandler(.performDefaultHandling, nil)
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        // Release network access count when task finishes
+        NetworkGuard.shared.releaseNetworkAccess()
+    }
+    
+    // Optional: intercept initial request to pre-check access before challenge
+    func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
+        let host = task.originalRequest?.url?.host ?? "unknown"
+        _ = NetworkGuard.shared.requestNetworkAccess(for: host)
     }
 }
