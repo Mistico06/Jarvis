@@ -109,6 +109,13 @@ class ModelRuntime: ObservableObject {
         }
     }
     
+    // NEW method to switch models dynamically
+    func switchModel(to size: ModelSize) async {
+        if currentModel != size || !isModelLoaded {
+            await loadModel(size: size)
+        }
+    }
+    
     func generateText(
         prompt: String,
         maxTokens: Int = 512,
@@ -127,58 +134,4 @@ class ModelRuntime: ObservableObject {
         request.messages = [
             ChatMessage(role: .user, content: prompt)
         ]
-        request.maxTokens = maxTokens
-        request.temperature = temperature
-        request.topP = topP
-        request.stream = false
-        
-        let response = try await engine.chatCompletion(request: request)
-        
-        if let choice = response.choices.first {
-            let endTime = CFAbsoluteTimeGetCurrent()
-            tokenCount = choice.message.content.split(separator: " ").count
-            
-            if tokenCount > 0 {
-                tokensPerSecond = Double(tokenCount) / (endTime - startTime)
-                logger.info("Generated \(tokenCount) tokens at \(tokensPerSecond) tok/s")
-            }
-            
-            return choice.message.content
-        }
-        
-        throw ModelError.generationFailed
-    }
-    
-    func generateTextStream(
-        prompt: String,
-        maxTokens: Int = 512,
-        temperature: Float = 0.7,
-        onToken: @escaping (String) -> Void
-    ) async throws {
-        guard let engine = engine, isModelLoaded else {
-            throw ModelError.notLoaded
-        }
-        
-        let request = ChatCompletionRequest()
-        request.messages = [
-            ChatMessage(role: .user, content: prompt)
-        ]
-        request.maxTokens = maxTokens
-        request.temperature = temperature
-        request.stream = true
-        
-        for try await chunk in engine.chatCompletionStream(request: request) {
-            if let choice = chunk.choices.first,
-               let delta = choice.delta,
-               !delta.content.isEmpty {
-                onToken(delta.content)
-            }
-        }
-    }
-    
-    enum ModelError: Error {
-        case notLoaded
-        case generationFailed
-        case deviceNotSupported
-    }
-}
+        request.
