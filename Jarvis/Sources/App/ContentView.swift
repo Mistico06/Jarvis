@@ -17,6 +17,11 @@ struct ContentView: View {
                         HStack {
                             Image(systemName: "wifi")
                                 .foregroundColor(.orange)
+                                .rotationEffect(.degrees(appState.isNetworkActive ? 15 : 0))
+                                .animation(
+                                    .easeInOut(duration: 1).repeatForever(autoreverses: true),
+                                    value: appState.isNetworkActive
+                                )
                             Text("Network Active")
                                 .font(.caption)
                                 .foregroundColor(.orange)
@@ -25,25 +30,59 @@ struct ContentView: View {
                         .padding(.vertical, 6)
                         .background(Color.orange.opacity(0.1))
                         .cornerRadius(8)
+                        .accessibilityElement(children: .combine)
                         Spacer()
                     }
                     .padding(.top, 8)
                 }
             }
-            .navigationTitle("Jarvis")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
+        }
+        .navigationTitle("Jarvis")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
                 }
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
+                .accessibilityLabel("Settings")
             }
         }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
+    }
+}
+
+// Dummy placeholder views and classes for preview and completeness
+struct ChatView: View {
+    var body: some View {
+        Text("Chat goes here")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(.systemBackground))
+    }
+}
+
+struct SettingsView: View {
+    var body: some View {
+        Text("Settings")
+            .font(.title)
+            .padding()
+    }
+}
+
+// Dummy app state and network guard for preview
+class AppState: ObservableObject {
+    @Published var isNetworkActive: Bool = true
+}
+
+class NetworkGuard: ObservableObject {}
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+            .environmentObject(AppState())
+            .environmentObject(NetworkGuard())
     }
 }
