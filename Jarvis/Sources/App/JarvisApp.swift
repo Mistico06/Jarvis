@@ -2,6 +2,7 @@ import SwiftUI
 import Speech
 import AVFoundation
 
+@available(macOS 11.0, *)
 @main
 struct JarvisApp: App {
     @StateObject private var appState = AppState()
