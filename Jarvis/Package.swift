@@ -4,7 +4,6 @@ import PackageDescription
 let package = Package(
     name: "Jarvis",
     platforms: [
-        .macOS(.v11),
         .iOS(.v16),
     ],
     products: [
