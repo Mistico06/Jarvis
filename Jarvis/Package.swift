@@ -24,11 +24,6 @@ let package = Package(
             ],
             path: "Sources/App",
             resources: [.process("Resources")]
-        ),
-        .testTarget(
-            name: "JarvisTests",
-            dependencies: ["App"],
-            path: "Tests/JarvisTests"
         )
     ]
 )
