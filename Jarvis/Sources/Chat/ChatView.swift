@@ -17,7 +17,7 @@ struct ChatView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Messages list
+            // Message list with auto-scroll
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
@@ -25,8 +25,6 @@ struct ChatView: View {
                             MessageRow(message: message)
                                 .id(message.id)
                         }
-                        
-                        // Streaming message
                         if isGenerating && !streamingText.isEmpty {
                             MessageRow(message: Message(
                                 id: UUID(),
@@ -35,6 +33,7 @@ struct ChatView: View {
                                 timestamp: Date()
                             ))
                             .opacity(0.8)
+                            // You could add animation here
                         }
                     }
                     .padding(.horizontal)
@@ -48,11 +47,9 @@ struct ChatView: View {
                 }
             }
             
-            // Input area
+            // Input area with voice/image/text controls
             VStack(spacing: 12) {
-                // Voice/Image controls
                 HStack {
-                    // Voice input
                     Button {
                         toggleRecording()
                     } label: {
@@ -64,7 +61,6 @@ struct ChatView: View {
                     
                     Spacer()
                     
-                    // Camera
                     Button {
                         showingCamera = true
                     } label: {
@@ -74,7 +70,6 @@ struct ChatView: View {
                     }
                     .disabled(isGenerating)
                     
-                    // Image picker
                     Button {
                         showingImagePicker = true
                     } label: {
@@ -86,14 +81,17 @@ struct ChatView: View {
                 }
                 .padding(.horizontal)
                 
-                // Text input
                 HStack {
                     TextField("Ask Jarvis...", text: $messageText, axis: .vertical)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .disabled(isGenerating)
                     
                     Button {
-                        sendMessage()
+                        if isGenerating {
+                            // TODO: Add stop generation logic here
+                        } else {
+                            sendMessage()
+                        }
                     } label: {
                         Image(systemName: isGenerating ? "stop.circle" : "arrow.up.circle.fill")
                             .font(.title2)
@@ -144,7 +142,6 @@ struct ChatView: View {
         
         Task {
             do {
-                // Check if network modes are enabled for research
                 let enhancedPrompt = await enhancePromptIfNeeded(prompt)
                 
                 try await modelRuntime.generateTextStream(
@@ -157,7 +154,6 @@ struct ChatView: View {
                     }
                 }
                 
-                // Save the complete response
                 let responseMessage = Message(
                     id: UUID(),
                     content: streamingText,
@@ -188,10 +184,8 @@ struct ChatView: View {
     }
     
     private func enhancePromptIfNeeded(_ prompt: String) async -> String {
-        // If in offline mode, return prompt as-is
         guard appState.currentMode != .offline else { return prompt }
         
-        // Add research context based on mode
         switch appState.currentMode {
         case .quickSearch:
             if let searchResults = await QuickSearch.shared.search(query: prompt) {
