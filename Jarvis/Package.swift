@@ -1,29 +1,26 @@
-// swift-tools-version:5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
     name: "Jarvis",
     platforms: [
-        .iOS("18.0")
+        .macOS(.v10_15),
+        .iOS(.v16) // optional, if you're targeting iOS too
     ],
     products: [
-        .executable(name: "Jarvis", targets: ["App"])
+        .executable(name: "Jarvis", targets: ["Jarvis"]),
     ],
     dependencies: [
-        // Removed mlc-llm due to incompatibility with SwiftPM
-        .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0"..<"4.0.0"),
-        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.14.1")
+        // your dependencies here
     ],
     targets: [
-        .executableTarget(
-            name: "App",
-            dependencies: [
-                .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "SQLite", package: "SQLite.swift")
-            ],
-            path: "Sources/App",
-            // Remove or create Resources folder
-            resources: [] 
+        .target(
+            name: "Jarvis",
+            dependencies: []
+        ),
+        .testTarget(
+            name: "JarvisTests",
+            dependencies: ["Jarvis"]
         )
     ]
 )
