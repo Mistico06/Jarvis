@@ -21,7 +21,7 @@ let package = Package(
         .executableTarget(
             name: "Jarvis",
             dependencies: [
-                .product(name: "MLCLLMSwift", package: "mlc-llm"),
+                .product(name: "MLCSwift", package: "MLCSwift"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "SQLite", package: "SQLite.swift")
             ],
