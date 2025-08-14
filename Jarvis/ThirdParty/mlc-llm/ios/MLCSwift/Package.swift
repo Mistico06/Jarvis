@@ -1,5 +1,4 @@
 // swift-tools-version:5.5
-// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
@@ -20,7 +19,8 @@ let package = Package(
                 .headerSearchPath("../../tvm_home/include"),
                 .headerSearchPath("../../tvm_home/ffi/include"),
                 .headerSearchPath("../../tvm_home/3rdparty/dmlc-core/include"),
-                .headerSearchPath("../../tvm_home/3rdparty/dlpack/include")
+                .headerSearchPath("../../tvm_home/3rdparty/dlpack/include"),
+                .unsafeFlags(["-std=c++17", "-stdlib=libc++"])
             ]
         ),
         .target(
