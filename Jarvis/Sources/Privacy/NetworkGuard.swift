@@ -21,7 +21,18 @@ class NetworkGuard: ObservableObject {
     private func setupNetworkMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
-                self?.logger.info("Network path changed: \(path.status.description)")
+                let statusDescription: String
+                switch path.status {
+                case .satisfied:
+                    statusDescription = "Satisfied"
+                case .unsatisfied:
+                    statusDescription = "Unsatisfied"
+                case .requiresConnection:
+                    statusDescription = "Requires Connection"
+                @unknown default:
+                    statusDescription = "Unknown"
+                }
+                self?.logger.info("Network path changed: \(statusDescription)")
             }
         }
         monitor.start(queue: queue)
@@ -86,7 +97,8 @@ extension URLSession {
 
 /// URLSessionDelegate that checks network access with NetworkGuard before performing requests.
 class NetworkSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
-    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, 
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
                     completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         
         // Check with NetworkGuard before allowing connection
@@ -104,7 +116,7 @@ class NetworkSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelega
         NetworkGuard.shared.releaseNetworkAccess()
     }
     
-    // Optional: intercept initial request to pre-check access before challenge
+    // Deprecated in newer iOS, consider removing or replacing with network path monitoring if needed
     func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
         let host = task.originalRequest?.url?.host ?? "unknown"
         _ = NetworkGuard.shared.requestNetworkAccess(for: host)
