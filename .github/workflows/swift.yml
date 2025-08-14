@@ -44,7 +44,9 @@ jobs:
 
       - name: Build the package
         working-directory: Jarvis
-        run: swift build -v
+        run: |
+          swift package clean
+          swift build -v
 
       - name: Run tests
         working-directory: Jarvis
