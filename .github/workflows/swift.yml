@@ -33,16 +33,6 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Generate Xcode project
+      - name: Build the package
         working-directory: Jarvis
-        run: swift package generate-xcodeproj
-
-      - name: Build with Xcode
-        run: |
-          xcodebuild clean build \
-          -project Jarvis.xcodeproj \
-          -scheme Jarvis \
-          -destination "generic/platform=iOS" \
-          IPHONEOS_DEPLOYMENT_TARGET=18.0 \
-          CODE_SIGN_STYLE=Automatic \
-          -allowProvisioningUpdates
+        run: swift build -v
