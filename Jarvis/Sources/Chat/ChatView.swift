@@ -33,7 +33,6 @@ struct ChatView: View {
                                 timestamp: Date()
                             ))
                             .opacity(0.8)
-                            // You could add animation here
                         }
                     }
                     .padding(.horizontal)
@@ -46,7 +45,7 @@ struct ChatView: View {
                     }
                 }
             }
-            
+
             // Input area with voice/image/text controls
             VStack(spacing: 12) {
                 HStack {
@@ -58,9 +57,9 @@ struct ChatView: View {
                             .font(.title2)
                     }
                     .disabled(isGenerating)
-                    
+
                     Spacer()
-                    
+
                     Button {
                         showingCamera = true
                     } label: {
@@ -69,7 +68,7 @@ struct ChatView: View {
                             .font(.title2)
                     }
                     .disabled(isGenerating)
-                    
+
                     Button {
                         showingImagePicker = true
                     } label: {
@@ -80,15 +79,15 @@ struct ChatView: View {
                     .disabled(isGenerating)
                 }
                 .padding(.horizontal)
-                
+
                 HStack {
                     TextField("Ask Jarvis...", text: $messageText, axis: .vertical)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .disabled(isGenerating)
-                    
+
                     Button {
                         if isGenerating {
-                            // TODO: Add stop generation logic here
+                            // Optionally implement stop generation logic
                         } else {
                             sendMessage()
                         }

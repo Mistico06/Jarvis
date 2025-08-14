@@ -8,6 +8,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
+                // Background
                 Color(
                     #if os(iOS)
                     UIColor.systemBackground
@@ -19,15 +20,21 @@ struct ContentView: View {
                 )
                 .ignoresSafeArea()
 
+                // Main chat interface
                 ChatView()
                     .padding(.top, appState.currentMode != .offline ? 40 : 0)
 
+                // Network indicator
                 if appState.currentMode != .offline {
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "wifi")
+                            .foregroundColor(.orange)
                         Text("Network Active")
+                            .font(.caption)
+                            .foregroundColor(.orange)
                     }
-                    .padding()
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
                     .background(Color.orange.opacity(0.1))
                     .cornerRadius(8)
                     .padding(.top, 8)
@@ -48,5 +55,3 @@ struct ContentView: View {
                 SettingsView()
             }
         }
-    }
-}

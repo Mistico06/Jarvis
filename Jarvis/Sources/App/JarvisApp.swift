@@ -13,7 +13,12 @@ struct JarvisApp: App {
 
     init() {
         #if os(iOS)
-        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+        // Request microphone permission early
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            if !granted {
+                print("Microphone access denied.")
+            }
+        }
         #endif
     }
 

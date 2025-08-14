@@ -1,6 +1,6 @@
+// AudioEngine.swift
 import Foundation
 import os.log
-
 #if os(iOS)
 import Speech
 import AVFoundation
@@ -34,18 +34,26 @@ class AudioEngine: NSObject, ObservableObject {
     private func setupSpeechRecognizer() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale.current)
         speechRecognizer?.defaultTaskHint = .dictation
-        SFSpeechRecognizer.requestAuthorization { [weak self] status in
-            DispatchQueue.main.async {
-                // log permission
-            }
+        SFSpeechRecognizer.requestAuthorization { status in
+            // Handle authorization if needed
         }
     }
 
-    func startRecording(completion: @escaping (String) -> Void) { /* ... */ }
-    func stopRecording() { /* ... */ }
-    func speak(text: String) { /* ... */ }
-    func stopSpeaking() { /* ... */ }
+    func startRecording(completion: @escaping (String) -> Void) {
+        // Your full startRecording implementation here...
+    }
 
+    func stopRecording() {
+        // Your full stopRecording implementation here...
+    }
+
+    func speak(text: String) {
+        // Your full speak implementation here...
+    }
+
+    func stopSpeaking() {
+        // Your full stopSpeaking implementation here...
+    }
     #else
     func startRecording(completion: @escaping (String) -> Void) {
         logger.warning("Speech unavailable")
@@ -63,5 +71,7 @@ class AudioEngine: NSObject, ObservableObject {
 }
 
 #if os(iOS)
-extension AudioEngine: AVSpeechSynthesizerDelegate { /* ... */ }
+extension AudioEngine: AVSpeechSynthesizerDelegate {
+    // Implement delegate methods if needed
+}
 #endif
