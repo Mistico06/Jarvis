@@ -12,7 +12,7 @@ let package = Package(
     ],
     dependencies: [
         // Local dependency: mlc-llm cloned in ThirdParty
-        .package(path: "ThirdParty/mlc-llm/ios/MLCSwift"),
+        .package(path: "./Jarvis/ThirdParty/mlc-llm/ios/MLCSwift"),
         // Other dependencies
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0"..<"4.0.0"),
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.14.1")
