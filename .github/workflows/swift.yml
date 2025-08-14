@@ -33,6 +33,9 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Generate Xcode project
+        run: swift package generate-xcodeproj
+
       - name: Build with Xcode
         run: |
           xcodebuild clean build \
