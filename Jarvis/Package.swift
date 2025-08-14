@@ -17,7 +17,7 @@ let package = Package(
         .executableTarget(
             name: "Jarvis",
             dependencies: [],
-            path: "Sources/App",
+            path: "Sources/App"
         )
     ]
 )
