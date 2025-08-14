@@ -97,7 +97,7 @@ final class ModelRuntime: ObservableObject {
 
         // Generate with trailing-closure callback
         let outputs = try await eng.generate(inputs: inputs, maxTokens: maxTokens) { tokens, _ in
-            Task { @MainActor in
+            await MainActor.run {
                 self.tokensPerSecond = eng.tokensPerSecond
             }
         }
