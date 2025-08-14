@@ -1,5 +1,6 @@
 import Foundation
 import MLCLLMSwift
+import Combine
 import Metal
 import os.log
 
@@ -41,6 +42,10 @@ class ModelRuntime: ObservableObject {
             case .max: return 512
             }
         }
+    }
+    
+    enum ModelError: Error {
+        case notLoaded
     }
     
     private init() {
@@ -104,12 +109,12 @@ class ModelRuntime: ObservableObject {
             logger.info("Model loaded successfully: \(size)")
             
         } catch {
-            logger.error("Failed to load model: \(error)")
+            logger.error("Failed to load model: \(error.localizedDescription)")
             isModelLoaded = false
         }
     }
     
-    // NEW method to switch models dynamically
+    // Switch model dynamically
     func switchModel(to size: ModelSize) async {
         if currentModel != size || !isModelLoaded {
             await loadModel(size: size)
@@ -126,12 +131,25 @@ class ModelRuntime: ObservableObject {
         guard let engine = engine, isModelLoaded else {
             throw ModelError.notLoaded
         }
-        
+
         let startTime = CFAbsoluteTimeGetCurrent()
-        var tokenCount = 0
-        
+
         let request = ChatCompletionRequest()
         request.messages = [
             ChatMessage(role: .user, content: prompt)
         ]
-        request.
+        request.maxTokens = maxTokens
+        request.temperature = temperature
+        request.topP = topP
+        request.topK = topK
+
+        let response = try await engine.generateChatCompletion(request: request)
+
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+        if duration > 0 {
+            tokensPerSecond = Double(maxTokens) / duration
+        }
+
+        return response.choices.first?.message.content ?? ""
+    }
+}
