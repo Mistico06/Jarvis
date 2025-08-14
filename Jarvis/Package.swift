@@ -5,22 +5,22 @@ let package = Package(
     name: "Jarvis",
     platforms: [
         .macOS(.v10_15),
-        .iOS(.v16) // optional, if you're targeting iOS too
+        .iOS(.v16)
     ],
     products: [
         .executable(name: "Jarvis", targets: ["Jarvis"]),
     ],
     dependencies: [
-        // your dependencies here
+        // Add your dependencies here
     ],
     targets: [
-        .target(
+        .executableTarget(
             name: "Jarvis",
-            dependencies: []
-        ),
-        .testTarget(
-            name: "JarvisTests",
-            dependencies: ["Jarvis"]
+            dependencies: [],
+            path: "Sources/App",
+            resources: [
+                .process("Resources")
+            ]
         )
     ]
 )
