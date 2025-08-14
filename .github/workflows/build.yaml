@@ -31,7 +31,6 @@ jobs:
         working-directory: Jarvis
         run: |
           xcodebuild clean build \
-            -project Jarvis.xcodeproj \
             -scheme Jarvis \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
