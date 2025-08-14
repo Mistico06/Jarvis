@@ -29,7 +29,12 @@ final class ModelRuntime: ObservableObject {
             }
         }
     }
-    enum ModelError: Error { case notLoaded, failedToLoad, invalidResponse }
+
+    enum ModelError: Error {
+        case notLoaded
+        case failedToLoad
+        case invalidResponse
+    }
 
     // MARK: Init
     private init() {
@@ -60,9 +65,9 @@ final class ModelRuntime: ObservableObject {
         do {
             loadingProgress = 0.3
             var cfg = EngineConfig()
-            cfg.modelPath    = size.modelPath
-            cfg.modelLib     = "mlc-llm-libs/\(size.modelPath)"
-            cfg.deviceType   = .metal
+            cfg.modelPath      = size.modelPath
+            cfg.modelLib       = "mlc-llm-libs/\(size.modelPath)"
+            cfg.deviceType     = .metal
             cfg.maxNumSequence = 1
 
             loadingProgress = 0.6
@@ -91,8 +96,10 @@ final class ModelRuntime: ObservableObject {
         let inputs = try eng.tokenize(prompt)
 
         // Generate with callback to update token rate
-        let outputs = try await eng.generate(inputs: inputs,
-                                             maxTokens: maxTokens) { _, _ in
+        let outputs = try await eng.generate(
+            inputs: inputs,
+            maxTokens: maxTokens
+        ) { tokens, _ in
             Task { @MainActor in
                 self.tokensPerSecond = eng.tokensPerSecond
             }
