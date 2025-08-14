@@ -20,15 +20,14 @@ jobs:
         with:
           xcode-version: '16.2'
 
-      - name: Generate Xcode project
+      - name: List available schemes
         working-directory: Jarvis
-        run: swift package generate-xcodeproj
+        run: xcodebuild -list
 
-      - name: Build iOS app
+      - name: Build iOS package
         working-directory: Jarvis
         run: |
           xcodebuild clean build \
-            -project Jarvis.xcodeproj \
             -scheme Jarvis \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
