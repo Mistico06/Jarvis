@@ -155,7 +155,10 @@ struct SettingsView: View {
                             .tag(AppState.AppMode.voiceControl)
                     }
                     .onChange(of: appState.currentMode) { newMode in
-                        networkGuard.setNetworkMode(newMode)
+                        // Convert AppState.AppMode to NetworkGuard.NetworkMode
+                        if let networkMode = NetworkGuard.NetworkMode(rawValue: newMode.rawValue) {
+                            networkGuard.setNetworkMode(networkMode)
+                        }
                     }
 
                     if appState.currentMode != .offline {
@@ -234,7 +237,7 @@ struct SettingsView: View {
 
     private func clearAllData() {
         ConversationStore.shared.clear()
-        auditLog.clearLogs()
+        auditLog.clear()
         // If LocalEmbeddings is available, uncomment the next line
         // LocalEmbeddings.shared.clearCache()
     }
@@ -289,7 +292,7 @@ struct NetworkAuditView: View {
 
                 Section(header: Text("Settings")) {
                     Button("Clear Audit Log") {
-                        auditLog.clearLogs()
+                        auditLog.clear()
                     }
                     .foregroundColor(.red)
                 }
