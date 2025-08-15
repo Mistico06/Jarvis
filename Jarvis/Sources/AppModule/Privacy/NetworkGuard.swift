@@ -158,3 +158,4 @@ extension NetworkGuard.NetworkMode: CustomStringConvertible {
         }
     }
 }
+}
