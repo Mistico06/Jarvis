@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 
-// Chat message model
 struct Message: Identifiable, Codable, Equatable {
     let id: UUID
     let content: String
@@ -16,7 +15,6 @@ struct Message: Identifiable, Codable, Equatable {
     }
 }
 
-// Shared store for all chat views
 final class ConversationStore: ObservableObject {
     static let shared = ConversationStore()
 
@@ -24,7 +22,6 @@ final class ConversationStore: ObservableObject {
 
     private init() {}
 
-    // MARK: – CRUD
     func addMessage(_ message: Message) {
         messages.append(message)
     }
@@ -33,7 +30,7 @@ final class ConversationStore: ObservableObject {
         messages.removeAll()
     }
 
-    // SettingsView expects clearAll(); forward to clear()
+    // SettingsView calls clearAll()
     func clearAll() {
         clear()
     }

@@ -8,7 +8,6 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
 
     @Published var isNetworkAllowed = false
 
-    // Internal network mode used within NetworkGuard
     enum NetworkMode {
         case offline
         case quickSearch
@@ -40,7 +39,7 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         monitor.start(queue: queue)
     }
 
-    // Public API called by UI: accept AppState.AppMode and map internally
+    // UI passes AppState.AppMode. We map internally.
     func setNetworkMode(_ mode: AppState.AppMode) {
         let mapped: NetworkMode
         switch mode {
@@ -87,12 +86,12 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         return !activeRequests.isEmpty
     }
 
-    // MARK: - URLSessionDelegate
+    // MARK: - URLSessionDelegate (signatures aligned with SDK)
 
     func urlSession(_ session: URLSession,
                     task: URLSessionTask,
                     didReceive challenge: URLAuthenticationChallenge,
-                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+                    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         let host = task.originalRequest?.url?.host ?? "unknown"
         guard requestNetworkAccess(for: host) else {
             logger.warning("Network access denied for host: \(host)")
@@ -104,7 +103,7 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
 
     func urlSession(_ session: URLSession,
                     task: URLSessionTask,
-                    didCompleteWithError error: Error?) {
+                    didCompleteWithError error: (any Error)?) {
         if let error = error {
             logger.error("Network request completed with error: \(error.localizedDescription)")
         }
@@ -113,8 +112,8 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
 
     func urlSession(_ session: URLSession,
                     didReceive challenge: URLAuthenticationChallenge,
-                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        // Session-level authentication challenges (e.g. TLS)
+                    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        // Session-level challenges (e.g., TLS)
         completionHandler(.performDefaultHandling, nil)
     }
 
@@ -123,7 +122,6 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
     func validateRequest(_ request: URLRequest) -> Bool {
         guard let url = request.url, let host = url.host else { return false }
 
-        // Whitelist hosts
         let allowedHosts = [
             "api.openai.com",
             "api.anthropic.com",
@@ -148,7 +146,7 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
     }
 }
 
-// MARK: - Pretty description for internal NetworkMode
+// MARK: - Pretty description
 
 extension NetworkGuard.NetworkMode: CustomStringConvertible {
     var description: String {

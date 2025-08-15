@@ -19,14 +19,14 @@ class AuditLog: ObservableObject {
 
     func clearLogs() {
         logger.info("Audit log cleared")
-        // TODO: Clear persisted logs if stored
+        // TODO: Clear persisted logs if you store them
     }
 
-    // Expose logs to UI if needed; leaving empty to avoid compile errors
+    // Optional: expose logs for UI. For now, return empty to compile.
     var networkLogs: [NetworkLog] { [] }
 }
 
-// If you already define NetworkLog elsewhere, remove the struct below.
+// Optional: Only include this if not defined elsewhere.
 struct NetworkLog: Identifiable {
     let id = UUID()
     let host: String

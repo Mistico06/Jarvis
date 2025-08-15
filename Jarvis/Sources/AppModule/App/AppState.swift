@@ -4,7 +4,6 @@ import Foundation
 class AppState: ObservableObject {
     static let shared = AppState()
 
-    /// Represents the operational mode of the app.
     enum AppMode {
         case offline
         case quickSearch
@@ -19,8 +18,7 @@ class AppState: ObservableObject {
     private init() {}
 }
 
-// MARK: - ModelRuntime.ModelSize helpers used by UI
-
+// Helpers used by UI for display and storage path
 extension ModelRuntime.ModelSize {
     var displayName: String {
         switch self {
@@ -29,9 +27,8 @@ extension ModelRuntime.ModelSize {
         }
     }
 
-    // UI uses this to show storage path; adapt to your bundle layout
+    // Produces: Models/lite-q4_K_M.mlc or Models/max-q4_K_M.mlc
     var modelBundlePath: String {
-        // Produces: Models/lite-q4_K_M.mlc or Models/max-q4_K_M.mlc
         return "Models/\(self.rawValue)-q4_K_M.mlc"
     }
 }
