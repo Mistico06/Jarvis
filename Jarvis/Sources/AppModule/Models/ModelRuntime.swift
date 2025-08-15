@@ -32,7 +32,7 @@ final class ModelRuntime: ObservableObject {
         }
 
         var modelLib: String {
-            return "mlc-llm-lib/\(self.modelPath)" // ✅ fixed string interpolation
+            return "mlc-llm-lib/\(self.modelPath)" // ✅ FIXED interpolation
         }
     }
 
@@ -119,7 +119,8 @@ final class ModelRuntime: ObservableObject {
         }
 
         let inputs = try engine.tokenize(prompt)
-        _ = try await engine.generate( // ✅ fixed from \_ to _
+
+        _ = try await engine.generate( // ✅ FIXED from \_ to _
             inputs: inputs,
             maxTokens: maxTokens,
             temperature: temperature,
