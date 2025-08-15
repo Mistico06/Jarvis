@@ -32,7 +32,7 @@ final class ModelRuntime: ObservableObject {
         }
 
         var modelLib: String {
-            // MLCEngine expects "system://<modelLib>" in JSON; we pass raw here.
+            // MLCEngine expects "system://<modelLib>" in its internal JSON; we pass the raw path here.
             return "mlc-llm-libs/\(self.modelPath)"
         }
     }
@@ -68,7 +68,7 @@ final class ModelRuntime: ObservableObject {
         isLoaded = false
         loadingProgress = 0.0
 
-        // MLCEngine.reload in your version is async (non-throwing)
+        // MLCEngine.reload is async (non-throwing) in this implementation.
         loadingProgress = 0.3
         await engine.reload(modelPath: size.modelPath, modelLib: size.modelLib)
         loadingProgress = 1.0
@@ -77,6 +77,7 @@ final class ModelRuntime: ObservableObject {
     }
 
     // MARK: - Chat Generation (aggregated)
+    /// Aggregates the streamed deltas into a single String.
     func generateText(prompt: String, maxTokens: Int) async throws -> String {
         guard isLoaded else { throw ModelError.notLoaded }
 
@@ -101,8 +102,8 @@ final class ModelRuntime: ObservableObject {
             stop: nil,
             stream: true,
             stream_options: StreamOptions(include_usage: false),
-            temperature: 0.7,
-            top_p: 0.9,
+            temperature: Float(0.7),
+            top_p: Float(0.9),
             tools: nil,
             user: nil,
             response_format: nil
@@ -111,12 +112,11 @@ final class ModelRuntime: ObservableObject {
         for await chunk in stream {
             if let delta = chunk.choices.first?.delta?.content {
                 aggregated += delta
+                // Update TPS approximately by chars/4
                 let elapsed = Date().timeIntervalSince(start)
-                let tokenCount = max(1, aggregated.count / 4) // rough estimate
+                let tokenCount = max(1, aggregated.count / 4)
                 let tps = Double(tokenCount) / max(elapsed, 0.001)
-                // Either of the following lines is fine; keep one:
                 await MainActor.run { self.tokensPerSecond = tps }
-                // or: DispatchQueue.main.async { self.tokensPerSecond = tps }
             }
         }
 
@@ -124,6 +124,7 @@ final class ModelRuntime: ObservableObject {
     }
 
     // MARK: - Chat Generation (streaming tokens)
+    /// Streams tokens to a callback and updates tokensPerSecond as it goes.
     func generateTextStream(
         prompt: String,
         maxTokens: Int,
@@ -154,7 +155,7 @@ final class ModelRuntime: ObservableObject {
             stream: true,
             stream_options: StreamOptions(include_usage: false),
             temperature: Float(temperature),
-            top_p: 0.9,
+            top_p: Float(0.9),
             tools: nil,
             user: nil,
             response_format: nil
@@ -164,12 +165,11 @@ final class ModelRuntime: ObservableObject {
             if let delta = chunk.choices.first?.delta?.content, !delta.isEmpty {
                 onToken(delta)
                 producedChars += delta.count
+
                 let elapsed = Date().timeIntervalSince(start)
                 let approxTokens = max(1, producedChars / 4)
                 let tps = Double(approxTokens) / max(elapsed, 0.001)
-                // Either of the following lines is fine; keep one:
                 await MainActor.run { self.tokensPerSecond = tps }
-                // or: DispatchQueue.main.async { self.tokensPerSecond = tps }
             }
         }
     }
