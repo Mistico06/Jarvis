@@ -25,15 +25,16 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         setupNetworkMonitoring()
     }
 
-private func setupNetworkMonitoring() {
-    monitor.pathUpdateHandler = { path in
-        Task {
-            await MainActor.run {
+    private func setupNetworkMonitoring() {
+        monitor.pathUpdateHandler = { path in
+            Task { @MainActor in
                 self.isNetworkAllowed = path.status == .satisfied
                 let status = path.status == .satisfied ? "available" : "unavailable"
                 self.logger.info("Network status: \(status)")
             }
         }
+        let queue = DispatchQueue(label: "NetworkMonitor")
+        monitor.start(queue: queue)
     }
 
     func setNetworkMode(_ mode: NetworkMode) {
@@ -144,6 +145,7 @@ private func setupNetworkMonitoring() {
 
 // MARK: - Extensions
 
+// Moved outside the class to file scope - this fixes the compilation error
 extension NetworkGuard.NetworkMode: CustomStringConvertible {
     var description: String {
         switch self {
@@ -157,5 +159,4 @@ extension NetworkGuard.NetworkMode: CustomStringConvertible {
             return "Voice Control"
         }
     }
-}
 }
