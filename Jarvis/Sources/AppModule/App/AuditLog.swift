@@ -16,4 +16,9 @@ class AuditLog: ObservableObject {
     func logNetworkRequest(_ purpose: String) {
         logger.info("Network request for: \(purpose)")
     }
+
+    func clearLogs() {
+        logger.info("Audit log cleared")
+        // Add logic to clear stored logs if you persist them
+    }
 }

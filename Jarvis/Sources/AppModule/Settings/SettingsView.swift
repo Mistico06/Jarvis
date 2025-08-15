@@ -1401,3 +1401,4 @@ final class KnowledgeManager: ObservableObject {
         return formatter.string(fromByteCount: size)
     }
 }
+
