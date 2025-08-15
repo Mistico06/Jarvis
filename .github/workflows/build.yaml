@@ -1,4 +1,4 @@
-name: Build iOS App
+name: Build App
 
 on:
   push:
@@ -27,14 +27,16 @@ jobs:
         working-directory: Jarvis
         run: xcodebuild -list
 
-      - name: Build iOS package
+      - name: Build iOS package with full logging
         working-directory: Jarvis
         run: |
+          set -o pipefail
           xcodebuild clean build \
             -scheme Jarvis \
             -destination "generic/platform=iOS" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
-            CODE_SIGN_STYLE=Automatic
+            CODE_SIGN_STYLE=Automatic \
+            -verbose 2>&1 | tee xcodebuild.log
 
       - name: Upload xcodebuild log
         if: always()
@@ -42,3 +44,12 @@ jobs:
         with:
           name: xcodebuild-log
           path: Jarvis/xcodebuild.log
+
+      - name: Show compilation errors if build failed
+        if: failure()
+        working-directory: Jarvis
+        run: |
+          echo "=== COMPILATION ERRORS ==="
+          grep -A 5 -B 5 "error:" xcodebuild.log || true
+          echo "=== FATAL ERRORS ==="
+          grep -A 5 -B 5 "fatal error:" xcodebuild.log || true

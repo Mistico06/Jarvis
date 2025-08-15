@@ -8,6 +8,7 @@
 
 #include "LLMEngine.h"
 
+// Configure TVM/DMLC logging before including TVM headers.
 #define TVM_USE_LIBBACKTRACE 0
 #define DMLC_USE_LOGGING_LIBRARY 1
 
@@ -22,10 +23,10 @@ using tvm::ffi::String;
 using tvm::ffi::TypedFunction;
 
 @implementation JSONFFIEngine {
-  // Internal c++ classes
-  // internal module backed by JSON FFI
+  // Internal C++ classes
+  // Internal module backed by JSON FFI
   Module json_ffi_engine_;
-  // member functions
+  // Member functions
   Function init_background_engine_func_;
   Function unload_func_;
   Function reload_func_;
@@ -39,7 +40,7 @@ using tvm::ffi::TypedFunction;
 
 - (instancetype)init {
   if (self = [super init]) {
-    // load chat module
+    // Load chat module
     Function f_json_ffi_create = Function::GetGlobalRequired("mlc.json_ffi.CreateJSONFFIEngine");
     json_ffi_engine_ = f_json_ffi_create().cast<Module>();
     init_background_engine_func_ = json_ffi_engine_->GetFunction("init_background_engine");
