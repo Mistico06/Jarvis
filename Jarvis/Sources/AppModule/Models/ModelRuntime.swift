@@ -16,7 +16,7 @@ final class ModelRuntime: ObservableObject {
 
     // MARK: - Private Properties
     private let device: MTLDevice?
-    private var engine: LLMEngine
+    private var engine: MLCEngine
     private let logger = Logger(subsystem: "com.jarvis.model", category: "runtime")
 
     // MARK: - Enums
@@ -32,7 +32,8 @@ final class ModelRuntime: ObservableObject {
         }
 
         var modelLib: String {
-            return "mlc-llm-lib/\(self.modelPath)" // ✅ FIXED interpolation
+            // MLCEngine expects "system://<modelLib>" in JSON; we pass raw here.
+            return "mlc-llm-libs/\(self.modelPath)"
         }
     }
 
@@ -45,7 +46,7 @@ final class ModelRuntime: ObservableObject {
     // MARK: - Initialization
     private init() {
         device = MTLCreateSystemDefaultDevice()
-        engine = LLMEngine()
+        engine = MLCEngine()
         if let name = device?.name {
             logger.info("Metal device initialized: \(name)")
         } else {
@@ -67,75 +68,109 @@ final class ModelRuntime: ObservableObject {
         isLoaded = false
         loadingProgress = 0.0
 
-        do {
-            loadingProgress = 0.2
-            try await engine.reload(modelPath: size.modelPath, modelLib: size.modelLib)
-            loadingProgress = 1.0
-            isLoaded = true
-            logger.info("Model loaded: \(size.rawValue)")
-        } catch {
-            isLoaded = false
-            loadingProgress = 0.0
-            logger.error("Model load failed: \(error.localizedDescription)")
-        }
+        // MLCEngine.reload in your version is async (non-throwing)
+        loadingProgress = 0.3
+        await engine.reload(modelPath: size.modelPath, modelLib: size.modelLib)
+        loadingProgress = 1.0
+        isLoaded = true
+        logger.info("Model loaded: \(size.rawValue)")
     }
 
-    // MARK: - Text Generation
+    // MARK: - Chat Generation (aggregated)
     func generateText(prompt: String, maxTokens: Int) async throws -> String {
-        guard isLoaded else {
-            throw ModelError.notLoaded
-        }
+        guard isLoaded else { throw ModelError.notLoaded }
 
-        let inputs = try engine.tokenize(prompt)
-        let outputTokens = try await engine.generate(
-            inputs: inputs,
-            maxTokens: maxTokens,
-            temperature: Float(0.7),
-            topP: Float(0.9),
-            topK: 40,
-            frequencyPenalty: Float(0.0),
-            presencePenalty: Float(0.0),
-            progressCallback: { tokens, isComplete in
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    self.tokensPerSecond = engine.tokensPerSecond
-                }
-            }
+        var aggregated = ""
+        let start = Date()
+
+        let messages = [
+            ChatCompletionMessage(role: .user, content: prompt)
+        ]
+
+        let stream = await engine.chat.completions.create(
+            messages: messages,
+            model: nil,
+            frequency_penalty: nil,
+            presence_penalty: nil,
+            logprobs: false,
+            top_logprobs: 0,
+            logit_bias: nil,
+            max_tokens: maxTokens,
+            n: 1,
+            seed: nil,
+            stop: nil,
+            stream: true,
+            stream_options: StreamOptions(include_usage: false),
+            temperature: 0.7,
+            top_p: 0.9,
+            tools: nil,
+            user: nil,
+            response_format: nil
         )
 
-        let result = try engine.detokenize(outputTokens)
-        return result
+        for await chunk in stream {
+            if let delta = chunk.choices.first?.delta?.content {
+                aggregated += delta
+                let elapsed = Date().timeIntervalSince(start)
+                let tokenCount = max(1, aggregated.count / 4) // rough estimate
+                let tps = Double(tokenCount) / max(elapsed, 0.001)
+                // Either of the following lines is fine; keep one:
+                await MainActor.run { self.tokensPerSecond = tps }
+                // or: DispatchQueue.main.async { self.tokensPerSecond = tps }
+            }
+        }
+
+        return aggregated
     }
 
+    // MARK: - Chat Generation (streaming tokens)
     func generateTextStream(
         prompt: String,
         maxTokens: Int,
         temperature: Double,
         onToken: @escaping (String) -> Void
     ) async throws {
-        guard isLoaded else {
-            throw ModelError.notLoaded
-        }
+        guard isLoaded else { throw ModelError.notLoaded }
 
-        let inputs = try engine.tokenize(prompt)
+        let start = Date()
+        var producedChars = 0
 
-        _ = try await engine.generate(
-            inputs: inputs,
-            maxTokens: maxTokens,
+        let messages = [
+            ChatCompletionMessage(role: .user, content: prompt)
+        ]
+
+        let stream = await engine.chat.completions.create(
+            messages: messages,
+            model: nil,
+            frequency_penalty: nil,
+            presence_penalty: nil,
+            logprobs: false,
+            top_logprobs: 0,
+            logit_bias: nil,
+            max_tokens: maxTokens,
+            n: 1,
+            seed: nil,
+            stop: nil,
+            stream: true,
+            stream_options: StreamOptions(include_usage: false),
             temperature: Float(temperature),
-            topP: Float(0.9),
-            topK: 40,
-            frequencyPenalty: Float(0.0),
-            presencePenalty: Float(0.0),
-            progressCallback: { tokens, isComplete in
-                if let lastToken = tokens.last,
-                   let chunk = try? engine.detokenize([lastToken]) {
-                    onToken(chunk)
-                }
-                Task { @MainActor in
-                    self.tokensPerSecond = engine.tokensPerSecond
-                }
-            }
+            top_p: 0.9,
+            tools: nil,
+            user: nil,
+            response_format: nil
         )
+
+        for await chunk in stream {
+            if let delta = chunk.choices.first?.delta?.content, !delta.isEmpty {
+                onToken(delta)
+                producedChars += delta.count
+                let elapsed = Date().timeIntervalSince(start)
+                let approxTokens = max(1, producedChars / 4)
+                let tps = Double(approxTokens) / max(elapsed, 0.001)
+                // Either of the following lines is fine; keep one:
+                await MainActor.run { self.tokensPerSecond = tps }
+                // or: DispatchQueue.main.async { self.tokensPerSecond = tps }
+            }
+        }
     }
 }
