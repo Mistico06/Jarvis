@@ -2,69 +2,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PhotosUI
 
-// MARK: - Placeholder App Types To Make This File Compile
-
-// AppState with model selection and app mode
-final class AppState: ObservableObject {
-    enum AppMode {
-        case offline, quickSearch, deepResearch, voiceControl
-    }
-    @Published var selectedModel: ModelRuntime.ModelSize = .lite
-    @Published var currentMode: AppMode = .offline
-}
-
-// Minimal NetworkGuard
-final class NetworkGuard: ObservableObject {
-    func setNetworkMode(_ mode: AppState.AppMode) {}
-}
-
-// Minimal ModelRuntime reference for UI
-@MainActor
-final class ModelRuntime: ObservableObject {
-    static let shared = ModelRuntime()
-    enum ModelSize: String, CaseIterable, Identifiable {
-        case lite, max
-        var id: String { rawValue }
-        var modelBundlePath: String {
-            switch self {
-            case .lite: return "qwen2.5-3b-instruct-q4_K_M"
-            case .max:  return "qwen2.5-4b-instruct-q4_K_M"
-            }
-        }
-    }
-
-    @Published var isModelLoaded = true
-    @Published var tokensPerSecond: Double = 12.3
-    var currentModel: ModelSize = .lite
-
-    func switchModel(to size: ModelSize) async { currentModel = size }
-}
-
-// ConversationStore placeholder
-final class ConversationStore: ObservableObject {
-    static let shared = ConversationStore()
-    @Published var messages: [String] = []
-    func clearAll() {
-        messages.removeAll()
-    }
-}
-
-// Minimal AuditLog with callable method (not a Binding)
-final class AuditLog: ObservableObject {
-    static let shared = AuditLog()
-    func clearLogs() {
-        print("Audit logs cleared")
-    }
-}
-
-// LocalEmbeddings placeholder
-final class LocalEmbeddings: ObservableObject {
-    static let shared = LocalEmbeddings()
-    func clearCache() {
-        UserDefaults.standard.removeObject(forKey: "embeddings_cache")
-    }
-}
-
 // MARK: - Data Models Shared In This File
 
 struct NetworkLog: Identifiable {
@@ -1413,35 +1350,31 @@ final class KnowledgeManager: ObservableObject {
         }
     }
 
-    func addScannedDocuments(_ documents: [KnowledgeDocument]) {
-        selectedDocuments.append(contentsOf: documents)
+    func addScannedDocuments(_ docs: [KnowledgeDocument]) {
+        selectedDocuments.append(contentsOf: docs)
     }
 
-    func addCloudDocuments(_ documents: [KnowledgeDocument]) {
-        selectedDocuments.append(contentsOf: documents)
+    func addCloudDocuments(_ docs: [KnowledgeDocument]) {
+        selectedDocuments.append(contentsOf: docs)
     }
 
     func processDocuments() {
         isProcessing = true
         processedCount = 0
-
+        for (index, _) in selectedDocuments.enumerated() {
+            selectedDocuments[index].isProcessing = true
+        }
         Task {
             for (index, _) in selectedDocuments.enumerated() {
-                await MainActor.run {
-                    selectedDocuments[index].isProcessing = true
-                }
-
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s per doc
                 await MainActor.run {
                     selectedDocuments[index].isProcessing = false
                     selectedDocuments[index].isProcessed = true
                     processedCount += 1
-
-                    if processedCount == selectedDocuments.count {
-                        isProcessing = false
-                    }
                 }
+            }
+            await MainActor.run {
+                isProcessing = false
             }
         }
     }
@@ -1449,18 +1382,17 @@ final class KnowledgeManager: ObservableObject {
     func clearSelection() {
         selectedDocuments.removeAll()
         processedCount = 0
+        isProcessing = false
     }
 
     private func formatFileSize(_ url: URL) -> String {
-        do {
-            let resources = try url.resourceValues(forKeys: [.fileSizeKey])
-            let fileSize = resources.fileSize ?? 0
-            let formatter = ByteCountFormatter()
-            formatter.allowedUnits = [.useKB, .useMB]
-            formatter.countStyle = .file
-            return formatter.string(fromByteCount: Int64(fileSize))
-        } catch {
-            return "Unknown"
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int64 else {
+            return "0 KB"
         }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: size)
     }
 }
