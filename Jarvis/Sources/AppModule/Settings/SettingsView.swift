@@ -2,19 +2,8 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PhotosUI
 
-// Helper to avoid toolbar(content:) ambiguity at the NavigationStack scope.
-private struct TrailingDoneToolbar: View {
-    let action: () -> Void
-    var body: some View {
-        EmptyView()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done", action: action)
-                }
-            }
-    }
-}
-
+// iOS 17: Keep toolbar simple at the NavigationStack scope. If any ambiguity appears,
+// you can still use the TrailingDoneToolbar helper pattern shown previously.
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var modelRuntime: ModelRuntime
@@ -34,9 +23,9 @@ struct SettingsView: View {
                         Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
                         Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
                     }
-                    // iOS 15-compatible onChange with (oldValue, newValue)
-                    .onChange(of: appState.selectedModel) { _, newValue in
-                        Task { await modelRuntime.switchModel(to: newValue) }
+                    // iOS 17: parameterless variant allowed; read current state inside
+                    .onChange(of: appState.selectedModel, initial: false) {
+                        Task { await modelRuntime.switchModel(to: appState.selectedModel) }
                     }
 
                     if modelRuntime.isLoaded {
@@ -52,19 +41,14 @@ struct SettingsView: View {
                 // MARK: Network Modes
                 Section(header: Text("Network Modes")) {
                     Picker("Mode", selection: $appState.currentMode) {
-                        Label("Offline", systemImage: "wifi.slash")
-                            .tag(AppState.AppMode.offline)
-                        Label("Quick Search", systemImage: "magnifyingglass")
-                            .tag(AppState.AppMode.quickSearch)
-                        Label("Deep Research", systemImage: "doc.text.magnifyingglass")
-                            .tag(AppState.AppMode.deepResearch)
-                        Label("Voice Control", systemImage: "mic")
-                            .tag(AppState.AppMode.voiceControl)
+                        Label("Offline", systemImage: "wifi.slash").tag(AppState.AppMode.offline)
+                        Label("Quick Search", systemImage: "magnifyingglass").tag(AppState.AppMode.quickSearch)
+                        Label("Deep Research", systemImage: "doc.text.magnifyingglass").tag(AppState.AppMode.deepResearch)
+                        Label("Voice Control", systemImage: "mic").tag(AppState.AppMode.voiceControl)
                     }
-                    // iOS 15-compatible onChange with (oldValue, newValue)
-                    .onChange(of: appState.currentMode) { _, newValue in
-                        networkGuard.setNetworkMode(newValue)
-                        auditLog.logNetworkModeChange(newValue)
+                    .onChange(of: appState.currentMode, initial: false) {
+                        networkGuard.setNetworkMode(appState.currentMode)
+                        auditLog.logNetworkModeChange(appState.currentMode)
                     }
 
                     if appState.currentMode != .offline {
@@ -91,25 +75,15 @@ struct SettingsView: View {
 
                 // MARK: Data Engineering
                 Section(header: Text("Data Engineering")) {
-                    NavigationLink("Prompt Templates") {
-                        PromptTemplatesView()
-                    }
-                    NavigationLink("SQL Assistant") {
-                        SQLHelperView()
-                    }
-                    NavigationLink("Code Linter") {
-                        CodeLinterView()
-                    }
+                    NavigationLink("Prompt Templates") { PromptTemplatesView() }
+                    NavigationLink("SQL Assistant") { SQLHelperView() }
+                    NavigationLink("Code Linter") { CodeLinterView() }
                 }
 
                 // MARK: Local Learning
                 Section(header: Text("Local Learning")) {
-                    NavigationLink("Add Knowledge") {
-                        AddKnowledgeView()
-                    }
-                    NavigationLink("Manage Embeddings") {
-                        EmbeddingsView()
-                    }
+                    NavigationLink("Add Knowledge") { AddKnowledgeView() }
+                    NavigationLink("Manage Embeddings") { EmbeddingsView() }
                 }
 
                 // MARK: About
@@ -136,10 +110,11 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            // Use overlay helper to add the trailing toolbar without triggering ambiguity.
-            .overlay(
-                TrailingDoneToolbar { dismiss() }
-            )
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
         }
     }
 
@@ -209,11 +184,9 @@ struct PromptTemplatesView: View {
                             HStack {
                                 Text(template.name).font(.headline)
                                 Spacer()
-                                Button("Use") {
-                                    templateManager.useTemplate(template)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
+                                Button("Use") { templateManager.useTemplate(template) }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
                             }
                             Text(template.content)
                                 .font(.caption)
@@ -250,6 +223,7 @@ struct PromptTemplatesView: View {
 
     private var allowedTemplateTypes: [UTType] {
         var types: [UTType] = [.json, .text]
+        // iOS 17: UTType(importedAs:) returns non-optional UTType
         types.append(UTType(importedAs: "net.daringfireball.markdown"))
         return types
     }
@@ -322,31 +296,23 @@ struct SQLHelperView: View {
                 }
 
                 HStack(spacing: 12) {
-                    Button("Execute Query") {
-                        sqlHelper.executeQuery(queryText)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(queryText.isEmpty)
+                    Button("Execute Query") { sqlHelper.executeQuery(queryText) }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(queryText.isEmpty)
 
-                    Button("Validate") {
-                        sqlHelper.validateQuery(queryText)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(queryText.isEmpty)
+                    Button("Validate") { sqlHelper.validateQuery(queryText) }
+                        .buttonStyle(.bordered)
+                        .disabled(queryText.isEmpty)
 
-                    Button("Format") {
-                        queryText = sqlHelper.formatQuery(queryText)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(queryText.isEmpty)
+                    Button("Format") { queryText = sqlHelper.formatQuery(queryText) }
+                        .buttonStyle(.bordered)
+                        .disabled(queryText.isEmpty)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Results").font(.headline)
-                        if sqlHelper.isExecuting {
-                            ProgressView().scaleEffect(0.8)
-                        }
+                        if sqlHelper.isExecuting { ProgressView().scaleEffect(0.8) }
                     }
 
                     ScrollView {
@@ -455,9 +421,7 @@ struct CodeLinterView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Lint Results").font(.headline)
-                        if codeLinter.isLinting {
-                            ProgressView().scaleEffect(0.8)
-                        }
+                        if codeLinter.isLinting { ProgressView().scaleEffect(0.8) }
                     }
 
                     ScrollView {
@@ -595,7 +559,8 @@ struct AddKnowledgeView: View {
                                     if doc.isProcessing {
                                         ProgressView().scaleEffect(0.8)
                                     } else if doc.isProcessed {
-                                        Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
                                     }
                                 }
                                 .padding(.vertical, 4)
