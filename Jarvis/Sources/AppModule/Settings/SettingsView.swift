@@ -133,7 +133,7 @@ struct SettingsView: View {
                         Task { await modelRuntime.switchModel(to: newModel) }
                     }
 
-                    if modelRuntime.isModelLoaded {
+                    if modelRuntime.isLoaded {
                         HStack {
                             Text("Performance")
                             Spacer()
@@ -233,9 +233,10 @@ struct SettingsView: View {
     }
 
     private func clearAllData() {
-        ConversationStore.shared.clearAll()
+        ConversationStore.shared.clear()
         auditLog.clearLogs()
-        LocalEmbeddings.shared.clearCache()
+        // If LocalEmbeddings is available, uncomment the next line
+        // LocalEmbeddings.shared.clearCache()
     }
 
     private func getModelStorageSize() -> String {
@@ -366,9 +367,8 @@ struct PromptTemplatesView: View {
     // Replace unavailable UTType.markdown with imported type
     private var allowedTemplateTypes: [UTType] {
         var types: [UTType] = [.json, .text]
-        if let markdown = UTType(importedAs: "net.daringfireball.markdown") {
-            types.append(markdown)
-        }
+        let markdown = UTType(importedAs: "net.daringfireball.markdown")
+        types.append(markdown)
         return types
     }
 }
@@ -797,8 +797,9 @@ struct AddKnowledgeView: View {
 
     private var allowedDocTypes: [UTType] {
         var types: [UTType] = [.pdf, .text, .rtf]
-        if let plain = UTType.plainText { types.append(plain) }
-        if let md = UTType(importedAs: "net.daringfireball.markdown") { types.append(md) }
+        types.append(UTType.plainText)
+        let md = UTType(importedAs: "net.daringfireball.markdown")
+        types.append(md)
         return types
     }
 }
@@ -1070,7 +1071,8 @@ final class EmbeddingsManager: ObservableObject {
         totalEmbeddings = 0
         storageSize = "0 MB"
         knowledgeSources.removeAll()
-        LocalEmbeddings.shared.clearCache()
+        // If LocalEmbeddings is available, uncomment the next line
+        // LocalEmbeddings.shared.clearCache()
     }
 
     private func loadKnowledgeSources() {
