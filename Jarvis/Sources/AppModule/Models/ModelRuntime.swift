@@ -2,14 +2,12 @@ import Foundation
 import Combine
 import Metal
 import os.log
+// If MLCSwift is required, keep it; otherwise replace with your engine module.
 import MLCSwift
 
-// Content extraction helper for app-side usage
-// IMPORTANT: Replace body with exact accessors for your ChatCompletionMessageContent type.
+// Helper for extracting text from your engine's message content type.
+// Replace this with the exact API of your engine if different.
 private func extractText(from content: ChatCompletionMessageContent) -> String? {
-    // If enum: if case let .text(text) = content { return text }
-    // If struct: return content.text
-    // If parts: join .text parts
     let mirror = Mirror(reflecting: content)
     for child in mirror.children {
         if child.label == "text", let t = child.value as? String {
@@ -50,7 +48,7 @@ final class ModelRuntime: ObservableObject {
         }
 
         var modelLib: String {
-            // MLCEngine expects "system://<modelLib>" in its internal JSON; we pass the raw path here.
+            // Path for engine libraries; adapt to your engine’s expectations
             return "mlc-llm-libs/\(self.modelPath)"
         }
     }
@@ -86,22 +84,20 @@ final class ModelRuntime: ObservableObject {
         isLoaded = false
         loadingProgress = 0.0
 
-        // MLCEngine.reload is async (non-throwing) in this implementation.
         loadingProgress = 0.3
         await engine.reload(modelPath: size.modelPath, modelLib: size.modelLib)
         loadingProgress = 1.0
         isLoaded = true
         logger.info("Model loaded: \(size.rawValue)")
+        currentModel = size
     }
 
     // MARK: - Chat Generation (aggregated)
-    /// Aggregates the streamed deltas into a single String.
     func generateText(prompt: String, maxTokens: Int) async throws -> String {
         guard isLoaded else { throw ModelError.notLoaded }
 
         var aggregated = ""
         let start = Date()
-
         let messages = [
             ChatCompletionMessage(role: .user, content: prompt)
         ]
@@ -144,7 +140,6 @@ final class ModelRuntime: ObservableObject {
     }
 
     // MARK: - Chat Generation (streaming tokens)
-    /// Streams tokens to a callback and updates tokensPerSecond as it goes.
     func generateTextStream(
         prompt: String,
         maxTokens: Int,
@@ -155,7 +150,6 @@ final class ModelRuntime: ObservableObject {
 
         let start = Date()
         var producedChars = 0
-
         let messages = [
             ChatCompletionMessage(role: .user, content: prompt)
         ]
@@ -187,7 +181,6 @@ final class ModelRuntime: ObservableObject {
                 if let c = delta.content, let text = extractText(from: c), !text.isEmpty {
                     onToken(text)
                     producedChars += text.count
-
                     let elapsed = Date().timeIntervalSince(start)
                     let approxTokens = max(1, producedChars / 4)
                     let tps = Double(approxTokens) / max(elapsed, 0.001)

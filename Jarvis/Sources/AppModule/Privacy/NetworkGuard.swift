@@ -7,12 +7,8 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
     static let shared = NetworkGuard()
 
     @Published var isNetworkAllowed = false
-    @Published var currentMode: NetworkMode = .offline
 
-    private let monitor = NWPathMonitor()
-    private let logger = Logger(subsystem: "com.jarvis.network", category: "guard")
-    private var activeRequests: Set<String> = []
-
+    // Internal network mode used within NetworkGuard
     enum NetworkMode {
         case offline
         case quickSearch
@@ -20,28 +16,44 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         case voiceControl
     }
 
+    @Published private(set) var currentMode: NetworkMode = .offline
+
+    private let monitor = NWPathMonitor()
+    private let logger = Logger(subsystem: "com.jarvis.network", category: "guard")
+    private var activeRequests: Set<String> = []
+
     private override init() {
         super.init()
         setupNetworkMonitoring()
     }
 
     private func setupNetworkMonitoring() {
-        monitor.pathUpdateHandler = { path in
-            Task {
-                await MainActor.run {
-                    self.isNetworkAllowed = path.status == .satisfied
-                    let status = path.status == .satisfied ? "available" : "unavailable"
-                    self.logger.info("Network status: \(status)")
-                }
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.isNetworkAllowed = (path.status == .satisfied)
+                let status = path.status == .satisfied ? "available" : "unavailable"
+                self.logger.info("Network status: \(status)")
             }
         }
+        let queue = DispatchQueue(label: "com.jarvis.network.monitor")
+        monitor.start(queue: queue)
     }
 
-    func setNetworkMode(_ mode: NetworkMode) {
-        currentMode = mode
-        logger.info("Network mode changed to: \(String(describing: mode))")
-
+    // Public API called by UI: accept AppState.AppMode and map internally
+    func setNetworkMode(_ mode: AppState.AppMode) {
+        let mapped: NetworkMode
         switch mode {
+        case .offline:      mapped = .offline
+        case .quickSearch:  mapped = .quickSearch
+        case .deepResearch: mapped = .deepResearch
+        case .voiceControl: mapped = .voiceControl
+        }
+
+        currentMode = mapped
+        logger.info("Network mode changed to: \(String(describing: mapped))")
+
+        switch mapped {
         case .offline:
             isNetworkAllowed = false
         case .quickSearch, .deepResearch, .voiceControl:
@@ -49,12 +61,13 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         }
     }
 
+    // MARK: - Request gating
+
     func requestNetworkAccess(for purpose: String) -> Bool {
         guard isNetworkAllowed else {
             logger.warning("Network access denied for: \(purpose)")
             return false
         }
-
         activeRequests.insert(purpose)
         logger.info("Network access granted for: \(purpose)")
         return true
@@ -76,42 +89,41 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
 
     // MARK: - URLSessionDelegate
 
-    @MainActor
-    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-
-        // Extract host from the task's original request
+    func urlSession(_ session: URLSession,
+                    task: URLSessionTask,
+                    didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         let host = task.originalRequest?.url?.host ?? "unknown"
-
         guard requestNetworkAccess(for: host) else {
             logger.warning("Network access denied for host: \(host)")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
-
-        // Allow the connection to proceed
         completionHandler(.performDefaultHandling, nil)
     }
 
-    @MainActor
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    func urlSession(_ session: URLSession,
+                    task: URLSessionTask,
+                    didCompleteWithError error: Error?) {
         if let error = error {
             logger.error("Network request completed with error: \(error.localizedDescription)")
         }
         releaseNetworkAccess()
     }
 
-    @MainActor
-    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        // Handle session-level authentication challenges
+    func urlSession(_ session: URLSession,
+                    didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        // Session-level authentication challenges (e.g. TLS)
         completionHandler(.performDefaultHandling, nil)
     }
 
-    // MARK: - Network Request Validation
+    // MARK: - Request validation
 
     func validateRequest(_ request: URLRequest) -> Bool {
-        guard let url = request.url else { return false }
+        guard let url = request.url, let host = url.host else { return false }
 
-        // Validate against allowed domains/endpoints
+        // Whitelist hosts
         let allowedHosts = [
             "api.openai.com",
             "api.anthropic.com",
@@ -119,44 +131,32 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
             "huggingface.co"
         ]
 
-        guard let host = url.host else { return false }
-
-        let isAllowed = allowedHosts.contains { allowedHost in
-            host.hasSuffix(allowedHost)
-        }
-
+        let isAllowed = allowedHosts.contains { host.hasSuffix($0) }
         if !isAllowed {
             logger.warning("Request to unauthorized host blocked: \(host)")
         }
-
         return isAllowed
     }
 
-    // MARK: - Custom URLSession Factory
+    // MARK: - URLSession factory
 
     func createSecureURLSession() -> URLSession {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30.0
         configuration.timeoutIntervalForResource = 60.0
-
         return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }
 }
 
-// MARK: - Extensions
+// MARK: - Pretty description for internal NetworkMode
 
-// Moved outside the class to file scope - this fixes the compilation error
 extension NetworkGuard.NetworkMode: CustomStringConvertible {
     var description: String {
         switch self {
-        case .offline:
-            return "Offline"
-        case .quickSearch:
-            return "Quick Search"
-        case .deepResearch:
-            return "Deep Research"
-        case .voiceControl:
-            return "Voice Control"
+        case .offline:      return "Offline"
+        case .quickSearch:  return "Quick Search"
+        case .deepResearch: return "Deep Research"
+        case .voiceControl: return "Voice Control"
         }
     }
 }
