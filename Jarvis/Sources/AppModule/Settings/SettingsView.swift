@@ -34,8 +34,9 @@ struct SettingsView: View {
                         Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
                         Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
                     }
-                    .onChange(of: appState.selectedModel) {
-                        Task { await modelRuntime.switchModel(to: appState.selectedModel) }
+                    // iOS 15-compatible onChange with (oldValue, newValue)
+                    .onChange(of: appState.selectedModel) { _, newValue in
+                        Task { await modelRuntime.switchModel(to: newValue) }
                     }
 
                     if modelRuntime.isLoaded {
@@ -60,9 +61,10 @@ struct SettingsView: View {
                         Label("Voice Control", systemImage: "mic")
                             .tag(AppState.AppMode.voiceControl)
                     }
-                    .onChange(of: appState.currentMode) {
-                        networkGuard.setNetworkMode(appState.currentMode)
-                        auditLog.logNetworkModeChange(appState.currentMode)
+                    // iOS 15-compatible onChange with (oldValue, newValue)
+                    .onChange(of: appState.currentMode) { _, newValue in
+                        networkGuard.setNetworkMode(newValue)
+                        auditLog.logNetworkModeChange(newValue)
                     }
 
                     if appState.currentMode != .offline {
