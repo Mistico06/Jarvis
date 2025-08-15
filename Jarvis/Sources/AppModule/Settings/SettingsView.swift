@@ -2,6 +2,19 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PhotosUI
 
+// Helper to avoid toolbar(content:) ambiguity at the NavigationStack scope.
+private struct TrailingDoneToolbar: View {
+    let action: () -> Void
+    var body: some View {
+        EmptyView()
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done", action: action)
+                }
+            }
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var modelRuntime: ModelRuntime
@@ -121,11 +134,10 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            // Use overlay helper to add the trailing toolbar without triggering ambiguity.
+            .overlay(
+                TrailingDoneToolbar { dismiss() }
+            )
         }
     }
 
@@ -271,10 +283,10 @@ struct AddTemplateView: View {
             .navigationTitle("Add Template")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         templateManager.addTemplate(
                             name: templateName,
@@ -369,7 +381,7 @@ struct SQLHelperView: View {
             .navigationTitle("SQL Assistant")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("SELECT Query") {
                             queryText = "SELECT * FROM users WHERE active = 1;"
@@ -493,7 +505,7 @@ struct CodeLinterView: View {
             .navigationTitle("Code Linter")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("Swift Example") {
                             codeText = """
@@ -656,7 +668,7 @@ struct DocumentScannerView: View {
             .navigationTitle("Scan Documents")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
             }
@@ -679,7 +691,7 @@ struct CloudImporterView: View {
             .navigationTitle("Import from iCloud")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
             }
