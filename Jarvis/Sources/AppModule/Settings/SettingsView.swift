@@ -15,6 +15,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // MARK: AI Model
                 Section(header: Text("AI Model")) {
                     Picker("Model Size", selection: $appState.selectedModel) {
                         Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
@@ -34,12 +35,17 @@ struct SettingsView: View {
                     }
                 }
 
+                // MARK: Network Modes
                 Section(header: Text("Network Modes")) {
                     Picker("Mode", selection: $appState.currentMode) {
-                        Label("Offline", systemImage: "wifi.slash").tag(AppState.AppMode.offline)
-                        Label("Quick Search", systemImage: "magnifyingglass").tag(AppState.AppMode.quickSearch)
-                        Label("Deep Research", systemImage: "doc.text.magnifyingglass").tag(AppState.AppMode.deepResearch)
-                        Label("Voice Control", systemImage: "mic").tag(AppState.AppMode.voiceControl)
+                        Label("Offline", systemImage: "wifi.slash")
+                            .tag(AppState.AppMode.offline)
+                        Label("Quick Search", systemImage: "magnifyingglass")
+                            .tag(AppState.AppMode.quickSearch)
+                        Label("Deep Research", systemImage: "doc.text.magnifyingglass")
+                            .tag(AppState.AppMode.deepResearch)
+                        Label("Voice Control", systemImage: "mic")
+                            .tag(AppState.AppMode.voiceControl)
                     }
                     .onChange(of: appState.currentMode) {
                         networkGuard.setNetworkMode(appState.currentMode)
@@ -57,6 +63,7 @@ struct SettingsView: View {
                     }
                 }
 
+                // MARK: Privacy & Security
                 Section(header: Text("Privacy & Security")) {
                     NavigationLink("Network Audit Log") {
                         NetworkAuditView()
@@ -67,6 +74,7 @@ struct SettingsView: View {
                     .foregroundColor(.red)
                 }
 
+                // MARK: Data Engineering
                 Section(header: Text("Data Engineering")) {
                     NavigationLink("Prompt Templates") {
                         PromptTemplatesView()
@@ -79,6 +87,7 @@ struct SettingsView: View {
                     }
                 }
 
+                // MARK: Local Learning
                 Section(header: Text("Local Learning")) {
                     NavigationLink("Add Knowledge") {
                         AddKnowledgeView()
@@ -88,6 +97,7 @@ struct SettingsView: View {
                     }
                 }
 
+                // MARK: About
                 Section(header: Text("About")) {
                     HStack {
                         Text("Version")
@@ -119,18 +129,22 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: Helpers
+
     private func clearAllData() {
         ConversationStore.shared.clearAll()
         auditLog.clearLogs()
-        // If you have LocalEmbeddings singleton, uncomment:
+        // If you have LocalEmbeddings:
         // LocalEmbeddings.shared.clearCache()
     }
 
     private func getModelStorageSize() -> String {
         let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let fileURL = docsURL.appendingPathComponent(modelRuntime.currentModel.modelBundlePath)
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
-              let byteCount = attributes[.size] as? Int64 else {
+        guard
+            let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+            let byteCount = attributes[.size] as? Int64
+        else {
             return "0 MB"
         }
         let formatter = ByteCountFormatter()
@@ -149,6 +163,7 @@ struct NetworkAuditView: View {
         NavigationView {
             List {
                 Section(header: Text("Recent Network Activity")) {
+                    // Render your logs when available.
                     Text("No audit entries yet")
                         .foregroundColor(.secondary)
                 }
@@ -213,16 +228,19 @@ struct PromptTemplatesView: View {
             .sheet(isPresented: $showingAddTemplate) { AddTemplateView() }
             .fileImporter(
                 isPresented: $showingImportPicker,
-                allowedContentTypes: {
-                    var types: [UTType] = [.json, .text]
-                    if let md = UTType(importedAs: "net.daringfireball.markdown") { types.append(md) }
-                    return types
-                }(),
+                allowedContentTypes: allowedTemplateTypes,
                 allowsMultipleSelection: false
             ) { result in
                 templateManager.importTemplates(from: result)
             }
         }
+    }
+
+    // On newer SDKs these initializers return non-optional UTType; append directly.
+    private var allowedTemplateTypes: [UTType] {
+        var types: [UTType] = [.json, .text]
+        types.append(UTType(importedAs: "net.daringfireball.markdown"))
+        return types
     }
 }
 
@@ -435,7 +453,8 @@ struct CodeLinterView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             if codeLinter.lintIssues.isEmpty && !codeLinter.isLinting {
                                 HStack {
-                                    Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
                                     Text("No issues found").foregroundColor(.green)
                                 }
                                 .padding()
@@ -600,12 +619,7 @@ struct AddKnowledgeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .fileImporter(
                 isPresented: $showingDocumentPicker,
-                allowedContentTypes: {
-                    var types: [UTType] = [.pdf, .text, .rtf]
-                    if let plain = UTType.plainText { types.append(plain) }
-                    if let md = UTType(importedAs: "net.daringfireball.markdown") { types.append(md) }
-                    return types
-                }(),
+                allowedContentTypes: allowedDocTypes,
                 allowsMultipleSelection: true
             ) { result in
                 knowledgeManager.handleDocumentSelection(result)
@@ -621,6 +635,12 @@ struct AddKnowledgeView: View {
                 }
             }
         }
+    }
+
+    private var allowedDocTypes: [UTType] {
+        var types: [UTType] = [.pdf, .text, .rtf, .plainText]
+        types.append(UTType(importedAs: "net.daringfireball.markdown"))
+        return types
     }
 }
 
