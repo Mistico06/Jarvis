@@ -27,7 +27,10 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "SQLite", package: "SQLite.swift")
             ],
-            path: "Sources/AppModule" // Ensure this matches your folder layout
+            path: "Sources/AppModule", // Ensure this matches your folder layout
+            cSettings: [
+                    .headerSearchPath("../SourcePackages/checkouts/mlc-llm/3rdparty/tvm/include")
+            ]
         )
     ]
 )
