@@ -1423,12 +1423,6 @@ extension AuditLog {
     }
 }
 
-extension ModelRuntime.ModelSize {
-    var modelBundlePath: String {
-        return "Models/\(self.modelPath).mlc"
-    }
-}
-
 extension String {
     func trimPrefix(_ prefix: String) -> String {
         guard self.hasPrefix(prefix) else { return self }
