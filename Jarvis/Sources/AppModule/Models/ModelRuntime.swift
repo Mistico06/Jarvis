@@ -4,6 +4,24 @@ import Metal
 import os.log
 import MLCSwift
 
+// Content extraction helper for app-side usage
+// IMPORTANT: Replace body with exact accessors for your ChatCompletionMessageContent type.
+private func extractText(from content: ChatCompletionMessageContent) -> String? {
+    // If enum: if case let .text(text) = content { return text }
+    // If struct: return content.text
+    // If parts: join .text parts
+    let mirror = Mirror(reflecting: content)
+    for child in mirror.children {
+        if child.label == "text", let t = child.value as? String {
+            return t.isEmpty ? nil : t
+        }
+        if child.label == "content", let t = child.value as? String {
+            return t.isEmpty ? nil : t
+        }
+    }
+    return nil
+}
+
 @MainActor
 final class ModelRuntime: ObservableObject {
     static let shared = ModelRuntime()
@@ -110,13 +128,15 @@ final class ModelRuntime: ObservableObject {
         )
 
         for await chunk in stream {
-            if let delta = chunk.choices.first?.delta?.content {
-                aggregated += delta
-                // Update TPS approximately by chars/4
-                let elapsed = Date().timeIntervalSince(start)
-                let tokenCount = max(1, aggregated.count / 4)
-                let tps = Double(tokenCount) / max(elapsed, 0.001)
-                await MainActor.run { self.tokensPerSecond = tps }
+            if let choice = chunk.choices.first {
+                let delta = choice.delta
+                if let c = delta.content, let text = extractText(from: c), !text.isEmpty {
+                    aggregated += text
+                    let elapsed = Date().timeIntervalSince(start)
+                    let tokenCount = max(1, aggregated.count / 4) // rough estimate
+                    let tps = Double(tokenCount) / max(elapsed, 0.001)
+                    await MainActor.run { self.tokensPerSecond = tps }
+                }
             }
         }
 
@@ -162,14 +182,17 @@ final class ModelRuntime: ObservableObject {
         )
 
         for await chunk in stream {
-            if let delta = chunk.choices.first?.delta?.content, !delta.isEmpty {
-                onToken(delta)
-                producedChars += delta.count
+            if let choice = chunk.choices.first {
+                let delta = choice.delta
+                if let c = delta.content, let text = extractText(from: c), !text.isEmpty {
+                    onToken(text)
+                    producedChars += text.count
 
-                let elapsed = Date().timeIntervalSince(start)
-                let approxTokens = max(1, producedChars / 4)
-                let tps = Double(approxTokens) / max(elapsed, 0.001)
-                await MainActor.run { self.tokensPerSecond = tps }
+                    let elapsed = Date().timeIntervalSince(start)
+                    let approxTokens = max(1, producedChars / 4)
+                    let tps = Double(approxTokens) / max(elapsed, 0.001)
+                    await MainActor.run { self.tokensPerSecond = tps }
+                }
             }
         }
     }
