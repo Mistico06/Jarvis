@@ -87,15 +87,14 @@ final class ModelRuntime: ObservableObject {
         }
 
         let inputs = try engine.tokenize(prompt)
-
         let outputTokens = try await engine.generate(
             inputs: inputs,
             maxTokens: maxTokens,
-            temperature: 0.7,
-            topP: 0.9,
+            temperature: Float(0.7),
+            topP: Float(0.9),
             topK: 40,
-            frequencyPenalty: 0.0,
-            presencePenalty: 0.0,
+            frequencyPenalty: Float(0.0),
+            presencePenalty: Float(0.0),
             progressCallback: { tokens, isComplete in
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
@@ -120,14 +119,14 @@ final class ModelRuntime: ObservableObject {
 
         let inputs = try engine.tokenize(prompt)
 
-        _ = try await engine.generate( // ✅ FIXED from \_ to _
+        _ = try await engine.generate(
             inputs: inputs,
             maxTokens: maxTokens,
-            temperature: temperature,
-            topP: 0.9,
+            temperature: Float(temperature),
+            topP: Float(0.9),
             topK: 40,
-            frequencyPenalty: 0.0,
-            presencePenalty: 0.0,
+            frequencyPenalty: Float(0.0),
+            presencePenalty: Float(0.0),
             progressCallback: { tokens, isComplete in
                 if let lastToken = tokens.last,
                    let chunk = try? engine.detokenize([lastToken]) {
