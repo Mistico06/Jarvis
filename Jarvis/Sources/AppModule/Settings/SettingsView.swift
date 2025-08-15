@@ -121,11 +121,11 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(.automatic, content: {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
-            }
+            })
         }
     }
 
@@ -273,7 +273,7 @@ struct AddTemplateView: View {
             }
             .navigationTitle("Add Template")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(.automatic, content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
@@ -288,7 +288,7 @@ struct AddTemplateView: View {
                     }
                     .disabled(templateName.isEmpty || templateContent.isEmpty)
                 }
-            }
+            })
         }
     }
 }
@@ -371,7 +371,7 @@ struct SQLHelperView: View {
             .padding()
             .navigationTitle("SQL Assistant")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(.automatic, content: {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("SELECT Query") {
@@ -385,7 +385,7 @@ struct SQLHelperView: View {
                         }
                     }
                 }
-            }
+            })
         }
     }
 }
@@ -495,7 +495,7 @@ struct CodeLinterView: View {
             .padding()
             .navigationTitle("Code Linter")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(.automatic, content: {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("Swift Example") {
@@ -526,7 +526,7 @@ struct CodeLinterView: View {
                         }
                     }
                 }
-            }
+            })
         }
     }
 }
@@ -658,11 +658,11 @@ struct DocumentScannerView: View {
             .padding()
             .navigationTitle("Scan Documents")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(.automatic, content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-            }
+            })
         }
     }
 }
@@ -681,11 +681,11 @@ struct CloudImporterView: View {
             .padding()
             .navigationTitle("Import from iCloud")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(.automatic, content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-            }
+            })
         }
     }
 }
