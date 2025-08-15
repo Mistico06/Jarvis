@@ -27,14 +27,14 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
 
     private func setupNetworkMonitoring() {
         monitor.pathUpdateHandler = { path in
-            Task { @MainActor in
-                self.isNetworkAllowed = path.status == .satisfied
-                let status = path.status == .satisfied ? "available" : "unavailable"
-                self.logger.info("Network status: \(status)")
+            Task {
+                await MainActor.run {
+                    self.isNetworkAllowed = path.status == .satisfied
+                    let status = path.status == .satisfied ? "available" : "unavailable"
+                    self.logger.info("Network status: \(status)")
+                }
             }
         }
-        let queue = DispatchQueue(label: "NetworkMonitor")
-        monitor.start(queue: queue)
     }
 
     func setNetworkMode(_ mode: NetworkMode) {
