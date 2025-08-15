@@ -8,18 +8,18 @@ import MLCSwift
 final class ModelRuntime: ObservableObject {
     static let shared = ModelRuntime()
 
-    // MARK: Published State
+    // MARK: - Published State
     @Published var isModelLoaded = false
     @Published var currentModel: ModelSize = .lite
     @Published var loadingProgress = 0.0
     @Published var tokensPerSecond = 0.0
 
-    // MARK: Private Properties
+    // MARK: - Private Properties
     private var engine: MLCEngine?
     private let device: MTLDevice?
     private let logger = Logger(subsystem: "com.jarvis.model", category: "runtime")
 
-    // MARK: Enums - FIXED: Added String raw type
+    // MARK: - Enums
     enum ModelSize: String {
         case lite = "lite"
         case max = "max"
@@ -27,7 +27,7 @@ final class ModelRuntime: ObservableObject {
         var modelPath: String {
             switch self {
             case .lite: return "qwen2.5-3b-instruct-q4_K_M"
-            case .max:  return "qwen2.5-4b-instruct-q4_K_M"
+            case .max: return "qwen2.5-4b-instruct-q4_K_M"
             }
         }
     }
@@ -38,17 +38,17 @@ final class ModelRuntime: ObservableObject {
         case invalidResponse
     }
 
-    // MARK: Init
+    // MARK: - Init
     private init() {
         device = MTLCreateSystemDefaultDevice()
         if let name = device?.name {
-            logger.info("Metal initialized: \(name)")
+            logger.info("Metal initialized: \(String(describing: name))")
         } else {
             logger.error("Failed to create Metal device")
         }
     }
 
-    // MARK: Public API
+    // MARK: - Public API
     func initializeModels() async {
         await loadModel(size: currentModel)
     }
@@ -58,7 +58,7 @@ final class ModelRuntime: ObservableObject {
         await loadModel(size: size)
     }
 
-    // MARK: Load
+    // MARK: - Load
     private func loadModel(size: ModelSize) async {
         isModelLoaded = false
         loadingProgress = 0.0
@@ -67,9 +67,9 @@ final class ModelRuntime: ObservableObject {
         do {
             loadingProgress = 0.3
             var cfg = EngineConfig()
-            cfg.modelPath      = size.modelPath
-            cfg.modelLib       = "mlc-llm-libs/\(size.modelPath)"
-            cfg.deviceType     = .metal
+            cfg.modelPath = size.modelPath
+            cfg.modelLib = "mlc-llm-libs/\(size.modelPath)"
+            cfg.deviceType = .metal
             cfg.maxNumSequence = 1
 
             loadingProgress = 0.6
@@ -81,14 +81,14 @@ final class ModelRuntime: ObservableObject {
 
             loadingProgress = 1.0
             isModelLoaded = true
-            logger.info("Model loaded: \(size)")
+            logger.info("Model loaded: \(String(describing: size))")
         } catch {
-            logger.error("Load failed: \(error.localizedDescription)")
+            logger.error("Load failed: \(String(describing: error.localizedDescription))")
             isModelLoaded = false
         }
     }
 
-    // MARK: Inference
+    // MARK: - Inference
     func generateText(prompt: String, maxTokens: Int) async throws -> String {
         guard let eng = engine else {
             throw ModelError.notLoaded
@@ -111,7 +111,6 @@ final class ModelRuntime: ObservableObject {
         return text
     }
 
-    // Add missing generateTextStream method for ChatView
     func generateTextStream(prompt: String, maxTokens: Int, temperature: Double, onToken: @escaping (String) -> Void) async throws {
         guard let eng = engine else {
             throw ModelError.notLoaded
