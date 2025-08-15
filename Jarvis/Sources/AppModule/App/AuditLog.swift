@@ -10,7 +10,7 @@ class AuditLog: ObservableObject {
     private init() {}
 
     func logNetworkModeChange(_ mode: AppState.AppMode) {
-        logger.info("Network mode changed to: \(mode)")
+        logger.info("Network mode changed to: \(String(describing: mode))")
     }
 
     func logNetworkRequest(_ purpose: String) {
