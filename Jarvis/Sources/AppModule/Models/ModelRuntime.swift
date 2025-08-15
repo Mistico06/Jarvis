@@ -19,9 +19,11 @@ final class ModelRuntime: ObservableObject {
     private let device: MTLDevice?
     private let logger = Logger(subsystem: "com.jarvis.model", category: "runtime")
 
-    // MARK: Enums
-    enum ModelSize {
-        case lite, max
+    // MARK: Enums - FIXED: Added String raw type
+    enum ModelSize: String {
+        case lite = "lite"
+        case max = "max"
+
         var modelPath: String {
             switch self {
             case .lite: return "qwen2.5-3b-instruct-q4_K_M"
@@ -107,5 +109,23 @@ final class ModelRuntime: ObservableObject {
             throw ModelError.invalidResponse
         }
         return text
+    }
+
+    // Add missing generateTextStream method for ChatView
+    func generateTextStream(prompt: String, maxTokens: Int, temperature: Double, onToken: @escaping (String) -> Void) async throws {
+        guard let eng = engine else {
+            throw ModelError.notLoaded
+        }
+
+        let inputs = try eng.tokenize(prompt)
+
+        _ = try await eng.generate(inputs: inputs, maxTokens: maxTokens) { tokens, _ in
+            if let token = try? eng.detokenize([tokens.last ?? 0]) {
+                onToken(token)
+            }
+            await MainActor.run {
+                self.tokensPerSecond = eng.tokensPerSecond
+            }
+        }
     }
 }
