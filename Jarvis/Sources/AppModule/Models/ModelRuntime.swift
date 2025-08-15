@@ -9,14 +9,14 @@ final class ModelRuntime: ObservableObject {
     static let shared = ModelRuntime()
 
     // MARK: - Published State
-    @Published var isModelLoaded = false
+    @Published var isLoaded = false
     @Published var currentModel: ModelSize = .lite
     @Published var loadingProgress = 0.0
     @Published var tokensPerSecond = 0.0
 
     // MARK: - Private Properties
-    private var engine: MLCEngine?
     private let device: MTLDevice?
+    private var engine: LLMEngine
     private let logger = Logger(subsystem: "com.jarvis.model", category: "runtime")
 
     // MARK: - Enums
@@ -27,8 +27,12 @@ final class ModelRuntime: ObservableObject {
         var modelPath: String {
             switch self {
             case .lite: return "qwen2.5-3b-instruct-q4_K_M"
-            case .max: return "qwen2.5-4b-instruct-q4_K_M"
+            case .max:  return "qwen2.5-4b-instruct-q4_K_M"
             }
+        }
+
+        var modelLib: String {
+            return "mlc-llm-lib/\(self.modelPath)" // ✅ fixed string interpolation
         }
     }
 
@@ -38,93 +42,100 @@ final class ModelRuntime: ObservableObject {
         case invalidResponse
     }
 
-    // MARK: - Init
+    // MARK: - Initialization
     private init() {
         device = MTLCreateSystemDefaultDevice()
+        engine = LLMEngine()
         if let name = device?.name {
-            logger.info("Metal initialized: \(String(describing: name))")
+            logger.info("Metal device initialized: \(name)")
         } else {
-            logger.error("Failed to create Metal device")
+            logger.error("Failed to initialize Metal device")
         }
     }
 
-    // MARK: - Public API
+    // MARK: - Model Loading
     func initializeModels() async {
         await loadModel(size: currentModel)
     }
 
     func switchModel(to size: ModelSize) async {
-        guard size != currentModel || !isModelLoaded else { return }
+        guard size != currentModel || !isLoaded else { return }
         await loadModel(size: size)
     }
 
-    // MARK: - Load
     private func loadModel(size: ModelSize) async {
-        isModelLoaded = false
+        isLoaded = false
         loadingProgress = 0.0
-        currentModel = size
 
         do {
-            loadingProgress = 0.3
-            var cfg = EngineConfig()
-            cfg.modelPath = size.modelPath
-            cfg.modelLib = "mlc-llm-libs/\(size.modelPath)"
-            cfg.deviceType = .metal
-            cfg.maxNumSequence = 1
-
-            loadingProgress = 0.6
-            engine = try MLCEngine(config: cfg)
-            loadingProgress = 0.9
-
-            // Test generation to verify model works
-            _ = try await generateText(prompt: "Hello", maxTokens: 5)
-
+            loadingProgress = 0.2
+            try await engine.reload(modelPath: size.modelPath, modelLib: size.modelLib)
             loadingProgress = 1.0
-            isModelLoaded = true
-            logger.info("Model loaded: \(String(describing: size))")
+            isLoaded = true
+            logger.info("Model loaded: \(size.rawValue)")
         } catch {
-            logger.error("Load failed: \(String(describing: error.localizedDescription))")
-            isModelLoaded = false
+            isLoaded = false
+            loadingProgress = 0.0
+            logger.error("Model load failed: \(error.localizedDescription)")
         }
     }
 
-    // MARK: - Inference
+    // MARK: - Text Generation
     func generateText(prompt: String, maxTokens: Int) async throws -> String {
-        guard let eng = engine else {
+        guard isLoaded else {
             throw ModelError.notLoaded
         }
 
-        // Tokenize prompt
-        let inputs = try eng.tokenize(prompt)
+        let inputs = try engine.tokenize(prompt)
 
-        // Generate with trailing-closure callback
-        let outputs = try await eng.generate(inputs: inputs, maxTokens: maxTokens) { tokens, _ in
-            await MainActor.run {
-                self.tokensPerSecond = eng.tokensPerSecond
+        let outputTokens = try await engine.generate(
+            inputs: inputs,
+            maxTokens: maxTokens,
+            temperature: 0.7,
+            topP: 0.9,
+            topK: 40,
+            frequencyPenalty: 0.0,
+            presencePenalty: 0.0,
+            progressCallback: { tokens, isComplete in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    self.tokensPerSecond = engine.tokensPerSecond
+                }
             }
-        }
+        )
 
-        // Detokenize output
-        guard let text = try? eng.detokenize(outputs) else {
-            throw ModelError.invalidResponse
-        }
-        return text
+        let result = try engine.detokenize(outputTokens)
+        return result
     }
 
-    func generateTextStream(prompt: String, maxTokens: Int, temperature: Double, onToken: @escaping (String) -> Void) async throws {
-        guard let eng = engine else {
+    func generateTextStream(
+        prompt: String,
+        maxTokens: Int,
+        temperature: Double,
+        onToken: @escaping (String) -> Void
+    ) async throws {
+        guard isLoaded else {
             throw ModelError.notLoaded
         }
 
-        let inputs = try eng.tokenize(prompt)
-
-        _ = try await eng.generate(inputs: inputs, maxTokens: maxTokens) { tokens, _ in
-            if let token = try? eng.detokenize([tokens.last ?? 0]) {
-                onToken(token)
+        let inputs = try engine.tokenize(prompt)
+        _ = try await engine.generate( // ✅ fixed from \_ to _
+            inputs: inputs,
+            maxTokens: maxTokens,
+            temperature: temperature,
+            topP: 0.9,
+            topK: 40,
+            frequencyPenalty: 0.0,
+            presencePenalty: 0.0,
+            progressCallback: { tokens, isComplete in
+                if let lastToken = tokens.last,
+                   let chunk = try? engine.detokenize([lastToken]) {
+                    onToken(chunk)
+                }
+                Task { @MainActor in
+                    self.tokensPerSecond = engine.tokensPerSecond
+                }
             }
-            await MainActor.run {
-                self.tokensPerSecond = eng.tokensPerSecond
-            }
-        }
+        )
     }
 }
