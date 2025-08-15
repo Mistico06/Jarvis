@@ -1,4 +1,5 @@
 import SwiftUI
+import MLCSwift
 import AVFoundation
 
 // MARK: - ConversationStore Extensions
