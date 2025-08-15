@@ -121,11 +121,11 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.automatic, content: {
+            .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
-            })
+            }
         }
     }
 
@@ -134,8 +134,7 @@ struct SettingsView: View {
     private func clearAllData() {
         ConversationStore.shared.clearAll()
         auditLog.clearLogs()
-        // If you have LocalEmbeddings:
-        // LocalEmbeddings.shared.clearCache()
+        // LocalEmbeddings.shared.clearCache() // if present
     }
 
     private func getModelStorageSize() -> String {
@@ -163,7 +162,6 @@ struct NetworkAuditView: View {
         NavigationView {
             List {
                 Section(header: Text("Recent Network Activity")) {
-                    // Render your logs when available.
                     Text("No audit entries yet")
                         .foregroundColor(.secondary)
                 }
@@ -236,7 +234,6 @@ struct PromptTemplatesView: View {
         }
     }
 
-    // On newer SDKs these initializers return non-optional UTType; append directly.
     private var allowedTemplateTypes: [UTType] {
         var types: [UTType] = [.json, .text]
         types.append(UTType(importedAs: "net.daringfireball.markdown"))
@@ -273,7 +270,7 @@ struct AddTemplateView: View {
             }
             .navigationTitle("Add Template")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.automatic, content: {
+            .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
@@ -288,7 +285,7 @@ struct AddTemplateView: View {
                     }
                     .disabled(templateName.isEmpty || templateContent.isEmpty)
                 }
-            })
+            }
         }
     }
 }
@@ -371,7 +368,7 @@ struct SQLHelperView: View {
             .padding()
             .navigationTitle("SQL Assistant")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.automatic, content: {
+            .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("SELECT Query") {
@@ -385,7 +382,7 @@ struct SQLHelperView: View {
                         }
                     }
                 }
-            })
+            }
         }
     }
 }
@@ -495,7 +492,7 @@ struct CodeLinterView: View {
             .padding()
             .navigationTitle("Code Linter")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.automatic, content: {
+            .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("Swift Example") {
@@ -526,7 +523,7 @@ struct CodeLinterView: View {
                         }
                     }
                 }
-            })
+            }
         }
     }
 }
@@ -658,11 +655,11 @@ struct DocumentScannerView: View {
             .padding()
             .navigationTitle("Scan Documents")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.automatic, content: {
+            .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-            })
+            }
         }
     }
 }
@@ -681,11 +678,11 @@ struct CloudImporterView: View {
             .padding()
             .navigationTitle("Import from iCloud")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.automatic, content: {
+            .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-            })
+            }
         }
     }
 }
