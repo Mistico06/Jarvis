@@ -122,7 +122,7 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -271,10 +271,10 @@ struct AddTemplateView: View {
             .navigationTitle("Add Template")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("Save") {
                         templateManager.addTemplate(
                             name: templateName,
@@ -369,7 +369,7 @@ struct SQLHelperView: View {
             .navigationTitle("SQL Assistant")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("SELECT Query") {
                             queryText = "SELECT * FROM users WHERE active = 1;"
@@ -493,7 +493,7 @@ struct CodeLinterView: View {
             .navigationTitle("Code Linter")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Menu("Examples") {
                         Button("Swift Example") {
                             codeText = """
@@ -656,7 +656,7 @@ struct DocumentScannerView: View {
             .navigationTitle("Scan Documents")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
             }
@@ -679,7 +679,7 @@ struct CloudImporterView: View {
             .navigationTitle("Import from iCloud")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
             }
