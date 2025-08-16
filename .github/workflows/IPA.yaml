@@ -31,8 +31,7 @@ jobs:
       - name: Set build context
         id: ctx
         run: |
-          echo "WORKSPACE=YourApp.xcworkspace" >> $GITHUB_OUTPUT   # if you have a workspace
-          # echo "PROJECT=YourApp.xcodeproj" >> $GITHUB_OUTPUT      # if you only have a project
+           echo "PROJECT=YourApp.xcodeproj" >> $GITHUB_OUTPUT      # if you only have a project
 
       - name: Archive (Release, unsigned)
         working-directory: Jarvis
