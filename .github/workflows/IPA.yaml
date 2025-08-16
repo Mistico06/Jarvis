@@ -1,10 +1,3 @@
-# .github/workflows/build-ipa.yml
-# Full workflow that:
-# 1) Installs XcodeGen
-# 2) Generates Jarvis/Jarvis.xcodeproj from Jarvis/project.yml
-# 3) Archives the app unsigned
-# 4) Packages an unsigned IPA suitable for AltStore
-
 name: Generate Project and Build IPA
 
 on:
@@ -22,12 +15,17 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Show layout (debug)
+      - name: Debug layout
         run: |
+          echo "== Repo root =="
           pwd
           ls -la
-          echo "--- Jarvis ---"
+          echo "== Jarvis dir =="
           ls -la Jarvis || true
+          echo "== Key files =="
+          test -f Jarvis/project.yml && echo "Jarvis/project.yml: OK" || echo "Jarvis/project.yml: MISSING"
+          test -f Jarvis/Package.swift && echo "Jarvis/Package.swift: OK" || echo "Jarvis/Package.swift: MISSING"
+          test -f Jarvis/Sources/AppModule/App/Info.plist && echo "Info.plist: OK" || echo "Info.plist: MISSING"
 
       - name: Set up Xcode 16.2
         uses: maxim-lobanov/setup-xcode@v1
@@ -37,17 +35,57 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode project (spec is Jarvis/project.yml)
+      # If you keep the native libs in another repo, fetch and copy them here.
+      # Adjust the source paths below to match that repo's structure.
+      - name: Fetch mlc-llm native artifacts (prebuilt) for iOS
+        run: |
+          set -e
+          git clone --depth=1 https://github.com/Mistico06/mlc-llm.git external/mlc-llm
+          mkdir -p Jarvis/dist/lib Jarvis/dist/bundle
+          # Copy native libraries (update source dir as needed)
+          if [ -d external/mlc-llm/prebuilt/ios/lib ]; then
+            cp -R external/mlc-llm/prebuilt/ios/lib/* Jarvis/dist/lib/ || true
+          fi
+          # Copy runtime assets (update source dir as needed)
+          if [ -d external/mlc-llm/prebuilt/ios/bundle ]; then
+            cp -R external/mlc-llm/prebuilt/ios/bundle/* Jarvis/dist/bundle/ || true
+          fi
+          echo "== Dist lib =="
+          ls -la Jarvis/dist/lib || true
+          echo "== Dist bundle =="
+          ls -la Jarvis/dist/bundle || true
+
+      - name: Clean any stale project
+        run: rm -rf Jarvis/Jarvis.xcodeproj
+
+      - name: Generate Xcode project (run inside Jarvis/)
         working-directory: Jarvis
         run: xcodegen generate
 
-      - name: Verify project created
+      - name: Verify project and artifacts
         run: |
-          ls -la Jarvis
+          set -e
           test -d Jarvis/Jarvis.xcodeproj || (echo "Missing Jarvis/Jarvis.xcodeproj" && exit 1)
+          test -f Jarvis/Package.swift || (echo "Missing Jarvis/Package.swift" && exit 1)
+          test -f Jarvis/Sources/AppModule/App/Info.plist || (echo "Missing Info.plist" && exit 1)
+          echo "== Native libs (optional but expected if you use MLCSwift) =="
+          ls -la Jarvis/dist/lib || true
+          echo "== Runtime bundle (optional) =="
+          ls -la Jarvis/dist/bundle || true
 
       - name: List schemes
         run: xcodebuild -list -project Jarvis/Jarvis.xcodeproj
+
+      - name: Build (optional fast fail)
+        run: |
+          set -o pipefail
+          xcodebuild clean build \
+            -project Jarvis/Jarvis.xcodeproj \
+            -scheme Jarvis \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGNING_IDENTITY="" \
+            IPHONEOS_DEPLOYMENT_TARGET=17.0
 
       - name: Archive (Release, unsigned)
         env:

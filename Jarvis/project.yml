@@ -1,4 +1,7 @@
-# Jarvis/project.yml — spec and Package.swift both live inside Jarvis/
+# Jarvis/project.yml
+# Spec and Package.swift both live inside Jarvis/.
+# Compiles all Swift files under Sources/AppModule and links the local package product AppModule.
+# Links MLC/TVM native libs if present under dist/lib and packages dist/bundle as app resources.
 
 name: Jarvis
 options:
@@ -21,13 +24,14 @@ targets:
     platform: iOS
     deploymentTarget: "17.0"
 
-    # Include all code under Sources/AppModule (recursively)
+    # Include all code under Sources/AppModule, plus explicit groups for clarity.
     sources:
       - path: Sources/AppModule
         name: AppModuleAll
         excludes:
           - "../Scripts/**"
           - "**/*.md"
+
       - path: Sources/AppModule/App
         name: App
       - path: Sources/AppModule/Chat
@@ -45,6 +49,14 @@ targets:
       - path: Sources/AppModule/Voice
         name: Voice
 
+      # Package runtime assets if you have an MLC bundle to ship with the app.
+      # Remove this block if you don't have such a folder.
+      - path: dist/bundle
+        type: folder
+        buildPhase: resources
+        optional: true
+        name: mlc-bundle
+
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.mistico06.jarvis
       MARKETING_VERSION: 1.0.0
@@ -53,6 +65,24 @@ targets:
       SWIFT_VERSION: 5.0
       ENABLE_PREVIEWS: YES
       INFOPLIST_FILE: Sources/AppModule/App/Info.plist
+
+      # Link native MLC/TVM libraries if they are present under dist/lib.
+      # Ensure these libraries exist in CI (commit them or fetch via a script).
+      LIBRARY_SEARCH_PATHS:
+        - "$(inherited)"
+        - "$(PROJECT_DIR)/dist/lib"
+      OTHER_LDFLAGS:
+        - "-Wl,-all_load"
+        - "-lmodel_iphone"
+        - "-lmlc_llm"
+        - "-ltvm_runtime"
+        - "-ltokenizers_cpp"
+        - "-lsentencepiece"
+        - "-ltokenizers_c"
+
+      # DO NOT add or link SwiftUICore explicitly. It is a private framework.
+
+      # If you later add entitlements, set the path here:
       # CODE_SIGN_ENTITLEMENTS: Sources/AppModule/App/Jarvis.entitlements
 
     dependencies:

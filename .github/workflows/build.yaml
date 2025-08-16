@@ -34,7 +34,7 @@ jobs:
           xcodebuild clean build \
             -scheme Jarvis \
             -destination "generic/platform=iOS" \
-            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             CODE_SIGN_STYLE=Automatic \
             -verbose 2>&1 | tee xcodebuild.log
 
