@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PhotosUI
 
-// Main Settings and nested form view
+// Settings root
 struct SettingsView: View {
     var body: some View {
         NavigationStack {
@@ -24,13 +24,14 @@ private struct SettingsFormView: View {
     var body: some View {
         Form {
             // MARK: AI Model
-            Section("AI Model") {
+            Section(header: Text("AI Model")) {
                 Picker("AI Model Size", selection: $appState.selectedModel) {
                     Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
                     Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
                 }
-                .onChange(of: appState.selectedModel, initial: false) {
-                    Task { await modelRuntime.switchModel(to: appState.selectedModel) }
+                // iOS 17 target is fine with either; use the clearer single-arg variant
+                .onChange(of: appState.selectedModel) { newValue in
+                    Task { await modelRuntime.switchModel(to: newValue) }
                 }
 
                 if modelRuntime.isLoaded {
@@ -44,14 +45,14 @@ private struct SettingsFormView: View {
             }
 
             // MARK: Network Modes
-            Section("Network Modes") {
+            Section(header: Text("Network Modes")) {
                 Picker("Network Mode", selection: $appState.currentMode) {
                     Label("Offline", systemImage: "wifi.slash").tag(AppState.AppMode.offline)
                     Label("Quick Search", systemImage: "magnifyingglass").tag(AppState.AppMode.quickSearch)
                     Label("Deep Research", systemImage: "doc.text.magnifyingglass").tag(AppState.AppMode.deepResearch)
                     Label("Voice Control", systemImage: "mic").tag(AppState.AppMode.voiceControl)
                 }
-                .onChange(of: appState.currentMode, initial: false) { newMode in
+                .onChange(of: appState.currentMode) { newMode in
                     networkGuard.setNetworkMode(newMode)
                     auditLog.logNetworkModeChange(newMode)
                 }
@@ -68,7 +69,7 @@ private struct SettingsFormView: View {
             }
 
             // MARK: Privacy & Security
-            Section("Privacy & Security") {
+            Section(header: Text("Privacy & Security")) {
                 NavigationLink("Network Audit Log") {
                     NetworkAuditView()
                 }
@@ -79,31 +80,20 @@ private struct SettingsFormView: View {
             }
 
             // MARK: Data Engineering
-            Section("Data Engineering") {
-                NavigationLink("Prompt Templates") {
-                    PromptTemplatesView()
-                }
-                NavigationLink("SQL Assistant") {
-                    SQLHelperView()
-                }
-                NavigationLink("Code Linter") {
-                    CodeLinterView()
-                }
+            Section(header: Text("Data Engineering")) {
+                NavigationLink("Prompt Templates") { PromptTemplatesView() }
+                NavigationLink("SQL Assistant") { SQLHelperView() }
+                NavigationLink("Code Linter") { CodeLinterView() }
             }
 
             // MARK: Local Learning
-            Section("Local Learning") {
-                NavigationLink("Add Knowledge") {
-                    AddKnowledgeView()
-                }
-                NavigationLink("Manage Embeddings") {
-                    // Keep EmbeddingsView in its own file to avoid redeclaration conflicts
-                    EmbeddingsView()
-                }
+            Section(header: Text("Local Learning")) {
+                NavigationLink("Add Knowledge") { AddKnowledgeView() }
+                NavigationLink("Manage Embeddings") { EmbeddingsDashboardView() } // Uses your EmbeddingsManager API
             }
 
             // MARK: About
-            Section("About") {
+            Section(header: Text("About")) {
                 HStack {
                     Text("Version")
                     Spacer()
@@ -136,85 +126,46 @@ private struct SettingsFormView: View {
     private func clearAllData() {
         ConversationStore.shared.clearAll()
         auditLog.clearLogs()
-        embeddingsManager.clearAll()
+        // Your EmbeddingsManager API provides a clearing method:
+        embeddingsManager.clearAllEmbeddings()
         knowledgeManager.clearSelection()
     }
 
-    // Attempts to compute the size of the active model on disk.
-    // Assumes modelRuntime exposes a URL (or path) to the current model bundle or file.
-    // Falls back to "N/A" if path isn't available yet.
+    // Wire up to your runtime when you expose an actual URL/path; show N/A for now
     private func getModelSize() -> String {
-        // Preferred: a concrete URL from your runtime
-        // e.g., modelRuntime.currentModelURL or modelRuntime.currentModel.bundleURL
-        if let url = modelRuntime.currentModelURL {
-            return byteCount(at: url)
-        }
-        // Alternative: build Documents path if you only have a relative path
-        if let relativePath = modelRuntime.currentModelRelativePath {
-            let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let fileURL = docsURL.appendingPathComponent(relativePath)
-            return byteCount(at: fileURL)
-        }
-        // Fallback
-        return "N/A"
-    }
-
-    private func byteCount(at url: URL) -> String {
-        let fm = FileManager.default
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { return "N/A" }
-
-        var total: Int64 = 0
-
-        if isDir.boolValue {
-            if let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: [], errorHandler: nil) {
-                for case let fileURL as URL in enumerator {
-                    if let size = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
-                        total += Int64(size)
-                    }
-                }
-            }
-        } else {
-            if let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
-                total = Int64(size)
-            }
-        }
-
-        let fmt = ByteCountFormatter()
-        fmt.allowedUnits = [.useMB]
-        fmt.countStyle = .file
-        return fmt.string(fromByteCount: total)
+        "N/A"
     }
 }
 
-// MARK: - NetworkAuditView
+// MARK: - Network Audit (aligned to your AuditLog API)
 struct NetworkAuditView: View {
     @EnvironmentObject private var auditLog: AuditLog
 
     var body: some View {
         List {
-            Section("Recent Activity") {
-                if auditLog.entries.isEmpty {
+            Section(header: Text("Recent Activity")) {
+                // Your AuditLog currently does not expose in-memory entries; placeholder for now
+                if auditLog.networkLogs.isEmpty {
                     Text("No audit records available")
                         .foregroundColor(.secondary)
                 } else {
-                    ForEach(auditLog.entries) { entry in
+                    ForEach(auditLog.networkLogs) { log in
                         VStack(alignment: .leading, spacing: 4) {
-                            if let title = entry.title, !title.isEmpty {
-                                Text(title).font(.headline)
-                            }
-                            Text(entry.description)
+                            Text("\(log.method) \(log.host)\(log.path)")
+                                .font(.headline)
+                            Text(log.purpose)
                                 .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(log.timestamp.formatted())
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
                 }
             }
-            Section("Actions") {
-                Button("Clear Audit Log") {
-                    auditLog.clearLogs()
-                }
-                .foregroundColor(.red)
+            Section(header: Text("Actions")) {
+                Button("Clear Audit Log") { auditLog.clearLogs() }
+                    .foregroundColor(.red)
             }
         }
         .navigationTitle("Network Audit")
@@ -222,7 +173,7 @@ struct NetworkAuditView: View {
     }
 }
 
-// MARK: - PromptTemplatesView
+// MARK: - Prompt Templates (uses PromptTemplateManager API)
 struct PromptTemplatesView: View {
     @StateObject private var manager = PromptTemplateManager.shared
     @State private var showAddSheet = false
@@ -230,7 +181,7 @@ struct PromptTemplatesView: View {
 
     var body: some View {
         List {
-            Section("Templates") {
+            Section(header: Text("Templates")) {
                 if manager.templates.isEmpty {
                     Text("No templates yet").foregroundColor(.secondary)
                 } else {
@@ -261,7 +212,7 @@ struct PromptTemplatesView: View {
                     }
                 }
             }
-            Section("Actions") {
+            Section(header: Text("Actions")) {
                 Button("Add Template") { showAddSheet = true }
                 Button("Import Templates") { showImporter = true }
                 Button("Export Templates") { manager.exportTemplates() }
@@ -322,7 +273,7 @@ struct AddTemplateView: View {
     }
 }
 
-// MARK: - SQLHelperView
+// MARK: - SQL Assistant (local validator/executor placeholder)
 struct SQLHelperView: View {
     @State private var query = ""
     @State private var result = ""
@@ -330,25 +281,20 @@ struct SQLHelperView: View {
 
     var body: some View {
         Form {
-            Section("SQL Query") {
+            Section(header: Text("SQL Query")) {
                 TextEditor(text: $query)
                     .frame(minHeight: 100)
                     .font(.system(.body, design: .monospaced))
             }
             Section {
                 HStack {
-                    Button("Validate") {
-                        validateSQL()
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button("Execute") {
-                        executeSQL()
-                    }
-                    .buttonStyle(.borderedProminent)
+                    Button("Validate") { validateSQL() }
+                        .buttonStyle(.bordered)
+                    Button("Execute") { executeSQL() }
+                        .buttonStyle(.borderedProminent)
                 }
             }
-            Section("Results") {
+            Section(header: Text("Results")) {
                 if errorMessage.isEmpty {
                     ScrollView {
                         Text(result)
@@ -372,7 +318,6 @@ struct SQLHelperView: View {
             result = ""
             return
         }
-        // Naive validation: ensure statement ends with ; and contains common verbs
         let verbs = ["select", "update", "insert", "delete", "create", "drop", "alter"]
         let lower = trimmed.lowercased()
         guard trimmed.hasSuffix(";") else {
@@ -389,8 +334,6 @@ struct SQLHelperView: View {
         result = "Validation OK."
     }
 
-    // Minimal in-memory execution simulation (without external I/O)
-    // For real execution, wire to your SQLHelper/SQLite.swift layer.
     private func executeSQL() {
         validateSQL()
         guard errorMessage.isEmpty else { return }
@@ -408,7 +351,7 @@ struct SQLHelperView: View {
     }
 }
 
-// MARK: - CodeLinterView
+// MARK: - Code Linter (basic checks + formatter)
 struct CodeLinterView: View {
     @State private var code = ""
     @State private var lintResults: [String] = []
@@ -417,7 +360,7 @@ struct CodeLinterView: View {
 
     var body: some View {
         Form {
-            Section("Language") {
+            Section(header: Text("Language")) {
                 Picker("Language", selection: $language) {
                     ForEach(languages, id: \.self) { lang in
                         Text(lang)
@@ -425,24 +368,20 @@ struct CodeLinterView: View {
                 }
                 .pickerStyle(.menu)
             }
-            Section("Code") {
+            Section(header: Text("Code")) {
                 TextEditor(text: $code)
                     .frame(minHeight: 200)
                     .font(.system(.body, design: .monospaced))
             }
             Section {
                 HStack {
-                    Button("Lint") {
-                        lint()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button("Format") {
-                        code = format(code: code, language: language)
-                    }
-                    .buttonStyle(.bordered)
+                    Button("Lint") { lint() }
+                        .buttonStyle(.borderedProminent)
+                    Button("Format") { code = format(code: code, language: language) }
+                        .buttonStyle(.bordered)
                 }
             }
-            Section("Results") {
+            Section(header: Text("Results")) {
                 if lintResults.isEmpty {
                     Text("No results yet").foregroundColor(.secondary)
                 } else {
@@ -474,16 +413,20 @@ struct CodeLinterView: View {
     }
 
     private func format(code: String, language: String) -> String {
-        // Very light formatter: trim trailing spaces, ensure newline at EOF
+        // Simple formatter: strip trailing spaces, ensure EOF newline
         let lines = code.components(separatedBy: .newlines)
-        let trimmedLines = lines.map { $0.replacingOccurrences(of: #"\s+$"#, with: "", options: .regularExpression) }
+        let trimmedLines = lines.map { line in
+            var s = line
+            while s.last == " " || s.last == "\t" { _ = s.popLast() }
+            return s
+        }
         var joined = trimmedLines.joined(separator: "\n")
         if !joined.hasSuffix("\n") { joined.append("\n") }
         return joined
     }
 }
 
-// MARK: - AddKnowledgeView
+// MARK: - Add Knowledge (local importer + simulated processing)
 struct AddKnowledgeView: View {
     @State private var selectedFiles: [URL] = []
     @State private var isProcessing = false
@@ -564,13 +507,121 @@ struct AddKnowledgeView: View {
         guard !selectedFiles.isEmpty else { return }
         isProcessing = true
         processedCount = 0
-        // Simulate async processing
         Task {
             for _ in selectedFiles {
-                try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s each
+                try? await Task.sleep(nanoseconds: 300_000_000) // simulate 0.3s
                 processedCount += 1
             }
             isProcessing = false
         }
+    }
+}
+
+// MARK: - Embeddings Dashboard (uses your EmbeddingsManager API)
+struct EmbeddingsDashboardView: View {
+    @EnvironmentObject private var embeddingsManager: EmbeddingsManager
+
+    private var relativeLastUpdated: String {
+        let interval = Date().timeIntervalSince(embeddingsManager.lastUpdated)
+        let minutes = Int(interval / 60)
+        if minutes < 1 { return "just now" }
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        return "\(hours)h ago"
+    }
+
+    var body: some View {
+        List {
+            Section(header: Text("Overview")) {
+                HStack {
+                    Label("Total", systemImage: "number")
+                    Spacer()
+                    Text("\(embeddingsManager.totalEmbeddings)")
+                        .foregroundColor(.secondary)
+                }
+                HStack {
+                    Label("Storage", systemImage: "externaldrive")
+                    Spacer()
+                    Text(embeddingsManager.storageSize)
+                        .foregroundColor(.secondary)
+                }
+                HStack {
+                    Label("Dimensions", systemImage: "square.grid.3x3")
+                    Spacer()
+                    Text("\(embeddingsManager.vectorDimensions)")
+                        .foregroundColor(.secondary)
+                }
+                HStack {
+                    Label("Last Updated", systemImage: "clock")
+                    Spacer()
+                    Text(relativeLastUpdated)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Section(header: Text("Sources")) {
+                if embeddingsManager.knowledgeSources.isEmpty {
+                    Text("No sources yet").foregroundColor(.secondary)
+                } else {
+                    ForEach(embeddingsManager.knowledgeSources) { source in
+                        HStack(spacing: 12) {
+                            Image(systemName: source.icon)
+                                .foregroundColor(.blue)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(source.name).font(.headline)
+                                Text("\(source.embeddingCount) embeddings • updated \(source.lastUpdated.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if source.isProcessing {
+                                ProgressView().scaleEffect(0.8)
+                            } else {
+                                Menu {
+                                    Button("Rebuild") {
+                                        embeddingsManager.rebuildSource(source)
+                                    }
+                                    Button(role: .destructive) {
+                                        embeddingsManager.deleteSource(source)
+                                    } label: {
+                                        Text("Delete")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle")
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
+
+            Section(header: Text("Actions")) {
+                if embeddingsManager.isRebuilding {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Rebuilding all embeddings…")
+                        ProgressView(value: embeddingsManager.rebuildProgress)
+                    }
+                } else {
+                    Button("Refresh Data") {
+                        embeddingsManager.refreshData()
+                    }
+                    Button("Rebuild All Embeddings") {
+                        embeddingsManager.rebuildAllEmbeddings()
+                    }
+                    Button("Export Embeddings") {
+                        embeddingsManager.exportEmbeddings()
+                    }
+                    Button("Import Embeddings") {
+                        embeddingsManager.importEmbeddings()
+                    }
+                    Button("Clear All Embeddings", role: .destructive) {
+                        embeddingsManager.clearAllEmbeddings()
+                    }
+                }
+            }
+        }
+        .navigationTitle("Manage Embeddings")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
