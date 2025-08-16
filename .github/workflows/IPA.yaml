@@ -1,3 +1,12 @@
+# .github/workflows/build-ipa.yml
+# End-to-end CI:
+# - Checks out repo with submodules (mlcllm at external/mlcllm)
+# - Installs toolchains (CMake, Rust, XcodeGen)
+# - Builds mlcllm iOS device static libs via ios/prepare_libs.sh
+# - Stages libs (and optional bundle) into Jarvis/dist/*
+# - Generates the Xcode project from Jarvis/project.yml
+# - Builds, archives unsigned, and produces an unsigned IPA
+
 name: Generate Project and Build IPA
 
 on:
@@ -16,6 +25,7 @@ jobs:
           submodules: recursive
 
       - name: Debug layout
+        shell: bash
         run: |
           echo "== Repo root ==" && pwd
           ls -la
@@ -32,39 +42,45 @@ jobs:
         with:
           xcode-version: "16.2"
 
-      - name: Install build tools (CMake, Rustup) and XcodeGen
-        run: |
-          brew install cmake xcodegen rustup-init || true
-          if ! command -v rustup >/dev/null 2>&1; then
-            echo "Initializing rustup..."
-            rustup-init -y
-          fi
-          echo 'source $HOME/.cargo/env' >> $GITHUB_ENV
-
-      - name: Build mlc-llm iOS device static libs (arm64)
+      - name: Install build tools (CMake, Rust, XcodeGen)
         shell: bash
         run: |
           set -euxo pipefail
-          source $HOME/.cargo/env
+          brew install cmake xcodegen rustup-init || true
+          if ! command -v rustup >/dev/null 2>&1; then
+            rustup-init -y
+          fi
+          # Make cargo available to subsequent steps by exporting PATH via $GITHUB_ENV (valid KEY=VALUE lines)
+          echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
+          echo "PATH=$HOME/.cargo/bin:$PATH" >> "$GITHUB_ENV"
+          cmake --version
+          xcodegen --version
+          rustc --version || true
+          rustup --version || true
+
+      - name: Build mlcllm iOS device static libs (arm64)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # cargo/rustup now on PATH from previous step; no 'source' into $GITHUB_ENV
           cd external/mlcllm/ios
           chmod +x prepare_libs.sh
           ./prepare_libs.sh
           echo "== Built static libs =="
           find build -maxdepth 3 -type f -name "*.a" -print || true
 
-      - name: Stage mlc-llm libs and bundle into Jarvis/dist
+      - name: Stage mlcllm libs and optional bundle into Jarvis/dist
+        shell: bash
         run: |
           set -euxo pipefail
           mkdir -p Jarvis/dist/lib Jarvis/dist/bundle
 
-          # Copy all installed static libs from the submodule build.
-          # Adjust the source path below if your install layout differs.
+          # Copy installed static libs from the submodule build (adjust if your install path differs)
           if [ -d external/mlcllm/ios/build/lib ]; then
             cp -R external/mlcllm/ios/build/lib/*.a Jarvis/dist/lib/ || true
           fi
 
-          # Optionally copy runtime bundle assets if your pipeline generates them elsewhere in the submodule
-          # Example paths (adjust/remove as needed):
+          # Optionally copy runtime bundle assets if present (adjust/remove as needed)
           if [ -d external/mlcllm/ios/prebuilt/bundle ]; then
             cp -R external/mlcllm/ios/prebuilt/bundle/* Jarvis/dist/bundle/ || true
           fi
@@ -77,21 +93,37 @@ jobs:
           echo "== Dist bundle =="
           ls -la Jarvis/dist/bundle || true
           echo "== Architectures of libs =="
+          shopt -s nullglob
           for f in Jarvis/dist/lib/*.a; do
-            [ -f "$f" ] && (file "$f" || true; lipo -info "$f" || true)
+            file "$f" || true
+            lipo -info "$f" || true
           done
 
       - name: Clean any stale project
+        shell: bash
         run: rm -rf Jarvis/Jarvis.xcodeproj
 
       - name: Generate Xcode project (run inside Jarvis/)
         working-directory: Jarvis
+        shell: bash
         run: xcodegen generate
 
+      - name: Verify project and artifacts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -d Jarvis/Jarvis.xcodeproj || (echo "Missing Jarvis/Jarvis.xcodeproj" && exit 1)
+          test -f Jarvis/Package.swift || (echo "Missing Jarvis/Package.swift" && exit 1)
+          test -f Jarvis/Sources/AppModule/App/Info.plist || (echo "Missing Info.plist" && exit 1)
+          ls -la Jarvis/dist/lib || true
+          ls -la Jarvis/dist/bundle || true
+
       - name: List schemes
+        shell: bash
         run: xcodebuild -list -project Jarvis/Jarvis.xcodeproj
 
       - name: Build (optional fast fail)
+        shell: bash
         run: |
           set -o pipefail
           xcodebuild clean build \
@@ -105,6 +137,7 @@ jobs:
       - name: Archive (Release, unsigned)
         env:
           ARCHIVE_PATH: ${{ github.workspace }}/build/Jarvis.xcarchive
+        shell: bash
         run: |
           set -o pipefail
           xcodebuild clean archive \
@@ -119,6 +152,7 @@ jobs:
           xcodebuild -showBuildSettings -project Jarvis/Jarvis.xcodeproj -scheme Jarvis > xcodebuild.log 2>&1 || true
 
       - name: Inspect archive contents
+        shell: bash
         run: |
           find build/Jarvis.xcarchive -maxdepth 3 -print || true
 
@@ -126,6 +160,7 @@ jobs:
         env:
           ARCHIVE_PATH: ${{ github.workspace }}/build/Jarvis.xcarchive
           EXPORT_DIR:   ${{ github.workspace }}/build/export
+        shell: bash
         run: |
           set -o pipefail
           APP_DIR="$ARCHIVE_PATH/Products/Applications"
