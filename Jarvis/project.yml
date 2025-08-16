@@ -1,4 +1,4 @@
-# project.yml — place at repo root (same level as Package.swift)
+# Jarvis/project.yml — lives inside the Jarvis/ folder
 
 name: Jarvis
 options:
@@ -10,22 +10,10 @@ settings:
   BASE_SDK: iphoneos
   IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 
-# Your Swift package is at the repo root (path: .). We will consume its product "AppModule".
 packages:
+  # Local Swift package sits one level up from Jarvis/
   appmodule-local:
-    path: .
-
-# If you also want to pull other packages directly into the app target, you can add them here.
-# Not required if AppModule already depends on them in Package.swift.
-#  mlc-llm:
-#    url: https://github.com/Mistico06/mlc-llm.git
-#    branch: main
-#  swift-crypto:
-#    url: https://github.com/apple/swift-crypto.git
-#    from: 2.0.0
-#  sqlite-swift:
-#    url: https://github.com/stephencelis/SQLite.swift.git
-#    from: 0.13.0
+    path: ..
 
 targets:
   Jarvis:
@@ -33,33 +21,48 @@ targets:
     platform: iOS
     deploymentTarget: "17.0"
 
-    # App UI and assets should live under a dedicated app folder. If you keep your @main App
-    # (JarvisApp.swift) inside the package’s Sources/AppModule, that’s fine—this app target
-    # just needs to depend on AppModule (see dependencies below).
-    #
-    # Still, we define Jarvis/ as the app’s source root so you can add app-only resources later
-    # (Assets, Info.plist, etc.). If you don’t have an app-specific folder yet, keep this entry;
-    # it won’t fail if the folder is present but currently contains no .swift files.
+    # Explicitly include each subfolder you showed, plus a catch‑all for any future subfolders.
     sources:
-      - path: Jarvis
-        name: Jarvis
+      # Catch‑all for everything under Sources/AppModule (keeps future folders included)
+      - path: Sources/AppModule
+        name: AppModuleAll
         excludes:
+          - "../Scripts/**"
           - "**/*.md"
 
-    # If you have app resources (Assets.xcassets, Info.plist) under Jarvis/, point to them below.
+      # Explicit subfolders from your screenshots (kept mainly for clarity/organization in Xcode)
+      - path: Sources/AppModule/App
+        name: App
+      - path: Sources/AppModule/Chat
+        name: Chat
+      - path: Sources/AppModule/Models
+        name: Models
+      - path: Sources/AppModule/Privacy
+        name: Privacy
+      - path: Sources/AppModule/services
+        name: services
+      - path: Sources/AppModule/Settings
+        name: Settings
+      - path: Sources/AppModule/Vision
+        name: Vision
+      - path: Sources/AppModule/Voice
+        name: Voice
+
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.mistico06.jarvis        # <-- change to your bundle id
+      PRODUCT_BUNDLE_IDENTIFIER: com.mistico06.jarvis
       MARKETING_VERSION: 1.0.0
       CURRENT_PROJECT_VERSION: 1
       TARGETED_DEVICE_FAMILY: "1,2"
       SWIFT_VERSION: 5.0
       ENABLE_PREVIEWS: YES
-      # Create this file under Jarvis/ (recommended):
-      INFOPLIST_FILE: Jarvis/Info.plist
-      # If you have entitlements, uncomment and set the path:
-      # CODE_SIGN_ENTITLEMENTS: Jarvis/Jarvis.entitlements
 
-      # If you embed prebuilt libs (e.g., dist/lib), uncomment and adjust:
+      # Place this file alongside JarvisApp.swift as you planned
+      INFOPLIST_FILE: Sources/AppModule/App/Info.plist
+
+      # If you later add entitlements:
+      # CODE_SIGN_ENTITLEMENTS: Sources/AppModule/App/Jarvis.entitlements
+
+      # If you later link prebuilt libs (e.g., dist/lib), uncomment:
       # LIBRARY_SEARCH_PATHS:
       #   - "$(inherited)"
       #   - "$(PROJECT_DIR)/dist/lib"
@@ -72,18 +75,9 @@ targets:
       #   - "-lsentencepiece"
       #   - "-ltokenizers_c"
 
-    # Main app depends on your local Swift package product "AppModule"
     dependencies:
       - package: appmodule-local
         product: AppModule
-
-      # If you want the app to link external packages directly (optional):
-      # - package: mlc-llm
-      #   product: MLCSwift
-      # - package: swift-crypto
-      #   product: Crypto
-      # - package: sqlite-swift
-      #   product: SQLite
 
     scheme:
       testTargets: []
