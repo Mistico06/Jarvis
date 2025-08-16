@@ -1,12 +1,13 @@
 # .github/workflows/build-ipa.yml
-# End-to-end CI:
+# CI pipeline that:
 # - Checks out repo with submodules (mlcllm at external/mlcllm)
 # - Installs toolchains (CMake, Rust, XcodeGen)
 # - Configures & builds mlcllm iOS device static libs with CMake
+#   using a compatibility override: -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 #   (source = external/mlcllm, build/install prefix = external/mlcllm/ios/build)
 # - Stages libs (and optional bundle) into Jarvis/dist/*
 # - Generates the Xcode project from Jarvis/project.yml
-# - Builds, archives unsigned, and produces an unsigned IPA for AltStore
+# - Builds, archives unsigned, and produces an unsigned IPA
 
 name: Generate Project and Build IPA
 
@@ -60,7 +61,7 @@ jobs:
           rustc --version || true
           rustup --version || true
 
-      - name: Configure and build mlcllm (iOS arm64, device)
+      - name: Configure and build mlcllm (iOS arm64, device) with CMake policy override
         shell: bash
         run: |
           set -euxo pipefail
@@ -69,7 +70,7 @@ jobs:
           mkdir -p "$BUILD"
           # Add Rust target for iOS device (as prepare_libs.sh would)
           rustup target add aarch64-apple-ios || true
-          # Configure
+          # Configure (include compatibility override for old nested CMake projects)
           cmake -S "$SRC" -B "$BUILD" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SYSTEM_NAME=iOS \
@@ -84,7 +85,8 @@ jobs:
             -DMLC_LLM_INSTALL_STATIC_LIB=ON \
             -DUSE_METAL=ON \
             -DTVM_FFI_USE_LIBBACKTRACE=OFF \
-            -DTVM_FFI_BACKTRACE_ON_SEGFAULT=OFF
+            -DTVM_FFI_BACKTRACE_ON_SEGFAULT=OFF \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
           # Build & install static libs
           cmake --build "$BUILD" --config release --target mlc_llm_static -j
           cmake --build "$BUILD" --target install --config release -j
