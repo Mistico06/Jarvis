@@ -2,10 +2,11 @@
 # End-to-end CI:
 # - Checks out repo with submodules (mlcllm at external/mlcllm)
 # - Installs toolchains (CMake, Rust, XcodeGen)
-# - Builds mlcllm iOS device static libs via ios/prepare_libs.sh
+# - Configures & builds mlcllm iOS device static libs with CMake
+#   (source = external/mlcllm, build/install prefix = external/mlcllm/ios/build)
 # - Stages libs (and optional bundle) into Jarvis/dist/*
 # - Generates the Xcode project from Jarvis/project.yml
-# - Builds, archives unsigned, and produces an unsigned IPA
+# - Builds, archives unsigned, and produces an unsigned IPA for AltStore
 
 name: Generate Project and Build IPA
 
@@ -36,6 +37,7 @@ jobs:
           test -f Jarvis/project.yml && echo "Jarvis/project.yml: OK" || echo "Jarvis/project.yml: MISSING"
           test -f Jarvis/Package.swift && echo "Jarvis/Package.swift: OK" || echo "Jarvis/Package.swift: MISSING"
           test -f Jarvis/Sources/AppModule/App/Info.plist && echo "Info.plist: OK" || echo "Info.plist: MISSING"
+          test -f external/mlcllm/CMakeLists.txt && echo "mlcllm CMakeLists.txt: OK" || echo "mlcllm CMakeLists.txt: MISSING"
 
       - name: Set up Xcode 16.2
         uses: maxim-lobanov/setup-xcode@v1
@@ -50,7 +52,7 @@ jobs:
           if ! command -v rustup >/dev/null 2>&1; then
             rustup-init -y
           fi
-          # Make cargo available to subsequent steps by exporting PATH via $GITHUB_ENV (valid KEY=VALUE lines)
+          # Expose cargo to subsequent steps (must be KEY=VALUE lines)
           echo "CARGO_HOME=$HOME/.cargo" >> "$GITHUB_ENV"
           echo "PATH=$HOME/.cargo/bin:$PATH" >> "$GITHUB_ENV"
           cmake --version
@@ -58,36 +60,53 @@ jobs:
           rustc --version || true
           rustup --version || true
 
-      - name: Build mlcllm iOS device static libs (arm64)
+      - name: Configure and build mlcllm (iOS arm64, device)
         shell: bash
         run: |
           set -euxo pipefail
-          # cargo/rustup now on PATH from previous step; no 'source' into $GITHUB_ENV
-          cd external/mlcllm/ios
-          chmod +x prepare_libs.sh
-          ./prepare_libs.sh
+          SRC="$GITHUB_WORKSPACE/external/mlcllm"                 # contains CMakeLists.txt
+          BUILD="$GITHUB_WORKSPACE/external/mlcllm/ios/build"     # libs will be installed under ios/build
+          mkdir -p "$BUILD"
+          # Add Rust target for iOS device (as prepare_libs.sh would)
+          rustup target add aarch64-apple-ios || true
+          # Configure
+          cmake -S "$SRC" -B "$BUILD" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_SYSTEM_VERSION=14.0 \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_BUILD_WITH_INSTALL_NAME_DIR=ON \
+            -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
+            -DCMAKE_INSTALL_PREFIX="$BUILD" \
+            -DCMAKE_CXX_FLAGS="-O3" \
+            -DMLC_LLM_INSTALL_STATIC_LIB=ON \
+            -DUSE_METAL=ON \
+            -DTVM_FFI_USE_LIBBACKTRACE=OFF \
+            -DTVM_FFI_BACKTRACE_ON_SEGFAULT=OFF
+          # Build & install static libs
+          cmake --build "$BUILD" --config release --target mlc_llm_static -j
+          cmake --build "$BUILD" --target install --config release -j
           echo "== Built static libs =="
-          find build -maxdepth 3 -type f -name "*.a" -print || true
+          find "$BUILD" -maxdepth 3 -type f -name "*.a" -print || true
 
       - name: Stage mlcllm libs and optional bundle into Jarvis/dist
         shell: bash
         run: |
           set -euxo pipefail
           mkdir -p Jarvis/dist/lib Jarvis/dist/bundle
-
-          # Copy installed static libs from the submodule build (adjust if your install path differs)
+          # Copy installed static libs from the submodule build
           if [ -d external/mlcllm/ios/build/lib ]; then
             cp -R external/mlcllm/ios/build/lib/*.a Jarvis/dist/lib/ || true
           fi
-
-          # Optionally copy runtime bundle assets if present (adjust/remove as needed)
+          # Optionally copy runtime bundle assets if present in your submodule
           if [ -d external/mlcllm/ios/prebuilt/bundle ]; then
             cp -R external/mlcllm/ios/prebuilt/bundle/* Jarvis/dist/bundle/ || true
           fi
           if [ -d external/mlcllm/ios/MLCGen/output/bundle ]; then
             cp -R external/mlcllm/ios/MLCGen/output/bundle/* Jarvis/dist/bundle/ || true
           fi
-
           echo "== Dist lib =="
           ls -la Jarvis/dist/lib || true
           echo "== Dist bundle =="
