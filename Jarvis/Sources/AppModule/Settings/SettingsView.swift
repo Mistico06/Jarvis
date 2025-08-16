@@ -6,9 +6,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PhotosUI
 
-// Import the module where your other view components are defined
-import Modules // <-- Replace 'Modules' with the actual module name if different
-
 struct SettingsView: View {
     var body: some View {
         NavigationStack {
