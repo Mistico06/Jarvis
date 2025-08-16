@@ -28,7 +28,7 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
 
     private func setupNetworkMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
-            guard let self = self else { return }
+            guard let self else { return }
             Task { @MainActor in
                 self.isNetworkAllowed = (path.status == .satisfied)
                 let status = path.status == .satisfied ? "available" : "unavailable"
@@ -38,6 +38,8 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         let queue = DispatchQueue(label: "com.jarvis.network.monitor")
         monitor.start(queue: queue)
     }
+
+    // MARK: - Mode handling
 
     // UI passes AppState.AppMode. We map internally.
     func setNetworkMode(_ mode: AppState.AppMode) {
@@ -83,11 +85,19 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
     }
 
     var hasActiveNetworkRequests: Bool {
-        return !activeRequests.isEmpty
+        !activeRequests.isEmpty
     }
 
     // MARK: - URLSessionDelegate (signatures aligned with SDK)
 
+    // Session-level challenge (e.g., TLS)
+    func urlSession(_ session: URLSession,
+                    didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        completionHandler(.performDefaultHandling, nil)
+    }
+
+    // Task-level challenge
     func urlSession(_ session: URLSession,
                     task: URLSessionTask,
                     didReceive challenge: URLAuthenticationChallenge,
@@ -101,20 +111,14 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         completionHandler(.performDefaultHandling, nil)
     }
 
+    // Task completion
     func urlSession(_ session: URLSession,
                     task: URLSessionTask,
-                    didCompleteWithError error: (any Error)?) {
-        if let error = error {
+                    didCompleteWithError error: Error?) {
+        if let error {
             logger.error("Network request completed with error: \(error.localizedDescription)")
         }
         releaseNetworkAccess()
-    }
-
-    func urlSession(_ session: URLSession,
-                    didReceive challenge: URLAuthenticationChallenge,
-                    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        // Session-level challenges (e.g., TLS)
-        completionHandler(.performDefaultHandling, nil)
     }
 
     // MARK: - Request validation
