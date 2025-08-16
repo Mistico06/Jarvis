@@ -1,27 +1,36 @@
-// swift-tools-version: 5.9
+// swift-tools-version:5.9
 import PackageDescription
 
 let package = Package(
     name: "Jarvis",
+    defaultLocalization: "en",
     platforms: [
-        .iOS(.v18)
+        .iOS(.v17) // Raised deployment target to iOS 17
     ],
     products: [
-        .executable(name: "Jarvis", targets: ["App"])
+        .library(
+            name: "AppModule",
+            type: .static,
+            targets: ["AppModule"]
+        )
     ],
     dependencies: [
-        .package(url: "https://github.com/mlc-ai/mlc-llm.git", branch: "main"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0"..<"4.0.0"),
-        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.14.1")
+        // MLC LLM runtime
+        .package(url: "https://github.com/Mistico06/mlc-llm.git", branch: "main"),
+        // Crypto primitives
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "2.0.0"),
+        // SQLite wrapper
+        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.13.0")
     ],
     targets: [
-        .executableTarget(
-            name: "App",
+        .target(
+            name: "AppModule",
             dependencies: [
-                .product(name: "MLCLLMSwift", package: "mlc-llm"),
+                .product(name: "MLCSwift", package: "mlc-llm"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "SQLite", package: "SQLite.swift")
             ],
+            path: "Sources/AppModule" // Ensure this matches your folder layout
             path: "Sources/App",
             sources: [
                 ".", // only files in Sources/App (not subdirectories unless you want them)

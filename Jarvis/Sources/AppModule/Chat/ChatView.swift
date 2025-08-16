@@ -1,5 +1,59 @@
 import SwiftUI
+import MLCSwift
 import AVFoundation
+
+// MARK: - ConversationStore Extensions
+extension ConversationStore {
+    // Chat-specific methods
+    func addUserMessage(_ text: String) {
+        let message = Message(
+            id: UUID(),
+            content: text,
+            isUser: true,
+            timestamp: Date()
+        )
+        addMessage(message)
+    }
+
+    func addAssistantMessage(_ text: String) {
+        let message = Message(
+            id: UUID(),
+            content: text,
+            isUser: false,
+            timestamp: Date()
+        )
+        addMessage(message)
+    }
+
+    func addStreamingResponse(_ streamingText: String) -> Message {
+        return Message(
+            id: UUID(),
+            content: streamingText,
+            isUser: false,
+            timestamp: Date()
+        )
+    }
+
+    // Chat UI helpers
+    var hasMessages: Bool {
+        return !messages.isEmpty
+    }
+
+    var canSendMessage: Bool {
+        return !messages.isEmpty || true // Always allow first message
+    }
+}
+
+// MARK: - Message Extensions for Chat
+extension Message {
+    var displayContent: String {
+        return content.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var wordCount: Int {
+        return content.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+    }
+}
 
 struct ChatView: View {
     @EnvironmentObject private var modelRuntime: ModelRuntime
@@ -7,17 +61,18 @@ struct ChatView: View {
     @StateObject private var conversationStore = ConversationStore.shared
     @StateObject private var audioEngine = AudioEngine()
     @StateObject private var imageAnalyzer = ImageAnalyzer()
-    
+
     @State private var messageText = ""
     @State private var isRecording = false
     @State private var showingImagePicker = false
     @State private var showingCamera = false
     @State private var isGenerating = false
     @State private var streamingText = ""
-    
+    @State private var currentGenerationTask: Task<Void, Never>?
+
     var body: some View {
         VStack(spacing: 0) {
-            // Messages list
+            // Message list with auto-scroll
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
@@ -25,8 +80,6 @@ struct ChatView: View {
                             MessageRow(message: message)
                                 .id(message.id)
                         }
-                        
-                        // Streaming message
                         if isGenerating && !streamingText.isEmpty {
                             MessageRow(message: Message(
                                 id: UUID(),
@@ -47,12 +100,10 @@ struct ChatView: View {
                     }
                 }
             }
-            
-            // Input area
+
+            // Input area with voice/image/text controls
             VStack(spacing: 12) {
-                // Voice/Image controls
                 HStack {
-                    // Voice input
                     Button {
                         toggleRecording()
                     } label: {
@@ -61,10 +112,9 @@ struct ChatView: View {
                             .font(.title2)
                     }
                     .disabled(isGenerating)
-                    
+
                     Spacer()
-                    
-                    // Camera
+
                     Button {
                         showingCamera = true
                     } label: {
@@ -73,8 +123,7 @@ struct ChatView: View {
                             .font(.title2)
                     }
                     .disabled(isGenerating)
-                    
-                    // Image picker
+
                     Button {
                         showingImagePicker = true
                     } label: {
@@ -85,15 +134,18 @@ struct ChatView: View {
                     .disabled(isGenerating)
                 }
                 .padding(.horizontal)
-                
-                // Text input
+
                 HStack {
                     TextField("Ask Jarvis...", text: $messageText, axis: .vertical)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .disabled(isGenerating)
-                    
+
                     Button {
-                        sendMessage()
+                        if isGenerating {
+                            stopGeneration()
+                        } else {
+                            sendMessage()
+                        }
                     } label: {
                         Image(systemName: isGenerating ? "stop.circle" : "arrow.up.circle.fill")
                             .font(.title2)
@@ -120,78 +172,89 @@ struct ChatView: View {
             }
         }
     }
-    
+
     private func sendMessage() {
         guard !messageText.isEmpty else { return }
-        
-        let userMessage = Message(
-            id: UUID(),
-            content: messageText,
-            isUser: true,
-            timestamp: Date()
-        )
-        
-        conversationStore.addMessage(userMessage)
+
+        conversationStore.addUserMessage(messageText)
         let prompt = messageText
         messageText = ""
-        
+
         generateResponse(for: prompt)
     }
-    
+
     private func generateResponse(for prompt: String) {
         isGenerating = true
         streamingText = ""
-        
-        Task {
+
+        // Cancel any existing task
+        currentGenerationTask?.cancel()
+
+        // Create new task and store reference
+        currentGenerationTask = Task {
             do {
-                // Check if network modes are enabled for research
                 let enhancedPrompt = await enhancePromptIfNeeded(prompt)
-                
+
                 try await modelRuntime.generateTextStream(
                     prompt: enhancedPrompt,
-                    maxTokens: modelRuntime.currentModel.maxTokens,
+                    maxTokens: 512,
                     temperature: 0.7
                 ) { token in
+                    // Check if task was cancelled
+                    guard !Task.isCancelled else { return }
+
                     DispatchQueue.main.async {
                         streamingText += token
                     }
                 }
-                
-                // Save the complete response
-                let responseMessage = Message(
-                    id: UUID(),
-                    content: streamingText,
-                    isUser: false,
-                    timestamp: Date()
-                )
-                
+
                 await MainActor.run {
-                    conversationStore.addMessage(responseMessage)
+                    // Only complete if not cancelled
+                    guard !Task.isCancelled else { return }
+
+                    conversationStore.addAssistantMessage(streamingText)
                     streamingText = ""
                     isGenerating = false
+                    currentGenerationTask = nil
                 }
-                
+
             } catch {
                 await MainActor.run {
-                    let errorMessage = Message(
-                        id: UUID(),
-                        content: "Sorry, I encountered an error: \(error.localizedDescription)",
-                        isUser: false,
-                        timestamp: Date()
-                    )
-                    conversationStore.addMessage(errorMessage)
+                    guard !Task.isCancelled else { return }
+
+                    conversationStore.addAssistantMessage("Sorry, I encountered an error: \(error.localizedDescription)")
                     streamingText = ""
                     isGenerating = false
+                    currentGenerationTask = nil
                 }
             }
         }
     }
-    
+
+    private func stopGeneration() {
+        // Cancel the current generation task
+        currentGenerationTask?.cancel()
+        currentGenerationTask = nil
+
+        // Save any partial streaming text
+        if !streamingText.isEmpty {
+            let partialMessage = Message(
+                id: UUID(),
+                content: streamingText + " [Response stopped by user]",
+                isUser: false,
+                timestamp: Date()
+            )
+            conversationStore.addMessage(partialMessage)
+        }
+
+        // Reset state
+        streamingText = ""
+        isGenerating = false
+    }
+
     private func enhancePromptIfNeeded(_ prompt: String) async -> String {
-        // If in offline mode, return prompt as-is
         guard appState.currentMode != .offline else { return prompt }
-        
-        // Add research context based on mode
+
         switch appState.currentMode {
         case .quickSearch:
             if let searchResults = await QuickSearch.shared.search(query: prompt) {
@@ -201,13 +264,13 @@ struct ChatView: View {
             if let researchResults = await DeepResearch.shared.research(query: prompt) {
                 return "\(prompt)\n\nDetailed research context:\n\(researchResults)"
             }
-        case .offline:
+        case .offline, .voiceControl:
             break
         }
-        
+
         return prompt
     }
-    
+
     private func toggleRecording() {
         if isRecording {
             audioEngine.stopRecording()
@@ -218,20 +281,20 @@ struct ChatView: View {
         }
         isRecording.toggle()
     }
-    
+
     private func processImage(_ image: UIImage) {
         Task {
             let ocrText = await imageAnalyzer.extractText(from: image)
             let classification = await imageAnalyzer.classifyImage(image)
-            
+
             let imagePrompt = "I've captured an image. OCR text: \(ocrText). Classification: \(classification). Please analyze this image."
-            
+
             await MainActor.run {
                 messageText = imagePrompt
             }
         }
     }
-    
+
     private func setupAudioSession() {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .default)

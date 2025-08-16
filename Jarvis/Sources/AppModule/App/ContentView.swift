@@ -4,29 +4,31 @@ struct ContentView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var networkGuard: NetworkGuard
     @State private var showingSettings = false
-    
+
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .top) {
+                // ✅ Simplified since you only target iOS
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+
                 // Main chat interface
                 ChatView()
-                
-                // Network activity indicator
-                if appState.isNetworkActive {
-                    VStack {
-                        HStack {
-                            Image(systemName: "wifi")
-                                .foregroundColor(.orange)
-                            Text("Network Active")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                        Spacer()
+                    .padding(.top, appState.currentMode != .offline ? 40 : 0)
+
+                // Network indicator
+                if appState.currentMode != .offline {
+                    HStack(spacing: 8) {
+                        Image(systemName: "wifi")
+                            .foregroundColor(.orange)
+                        Text("Network Active")
+                            .font(.caption)
+                            .foregroundColor(.orange)
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(8)
                     .padding(.top, 8)
                 }
             }
