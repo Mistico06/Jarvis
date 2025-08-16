@@ -129,20 +129,21 @@ private struct SettingsFormView: View {
     private func getModelSize() -> String { "N/A" }
 }
 
-// MARK: - Network Audit (uses AuditLog.networkLogs)
+// MARK: - Network Audit (avoid Section overload issues by using VStack headers in List)
 struct NetworkAuditView: View {
     @EnvironmentObject private var auditLog: AuditLog
 
     var body: some View {
         List {
-            Section("Recent Activity") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Recent Activity").font(.headline)
                 if auditLog.networkLogs.isEmpty {
                     Text("No audit records available").foregroundColor(.secondary)
                 } else {
                     ForEach(auditLog.networkLogs) { log in
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(log.method) \(log.host)\(log.path)")
-                                .font(.headline)
+                                .font(.subheadline).bold()
                             Text(log.purpose)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -150,21 +151,23 @@ struct NetworkAuditView: View {
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }
-
-            Section("Actions") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Actions").font(.headline)
                 Button("Clear Audit Log") { auditLog.clearLogs() }
                     .foregroundColor(.red)
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Network Audit")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-// MARK: - Prompt Templates
+// MARK: - Prompt Templates (use VStack headers in List to avoid Section ambiguity)
 struct PromptTemplatesView: View {
     @StateObject private var manager = PromptTemplateManager.shared
     @State private var showAddSheet = false
@@ -172,7 +175,8 @@ struct PromptTemplatesView: View {
 
     var body: some View {
         List {
-            Section("Templates") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Templates").font(.headline)
                 if manager.templates.isEmpty {
                     Text("No templates yet").foregroundColor(.secondary)
                 } else {
@@ -197,17 +201,20 @@ struct PromptTemplatesView: View {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
+                        .padding(.vertical, 2)
                     }
                     .onDelete { offsets in manager.remove(atOffsets: offsets) }
                 }
             }
 
-            Section("Actions") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Actions").font(.headline)
                 Button("Add Template") { showAddSheet = true }
                 Button("Import Templates") { showImporter = true }
                 Button("Export Templates") { manager.exportTemplates() }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Prompt Templates")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddSheet) { AddTemplateView() }
@@ -400,7 +407,7 @@ struct CodeLinterView: View {
     }
 }
 
-// MARK: - Add Knowledge
+// MARK: - Add Knowledge (standalone VStack; no List Sections)
 struct AddKnowledgeView: View {
     @State private var selectedFiles: [URL] = []
     @State private var isProcessing = false
@@ -491,7 +498,7 @@ struct AddKnowledgeView: View {
     }
 }
 
-// MARK: - Embeddings Dashboard (EmbeddingsManager-aligned)
+// MARK: - Embeddings Dashboard (no List Sections to avoid overloads)
 struct EmbeddingsDashboardView: View {
     @EnvironmentObject private var embeddingsManager: EmbeddingsManager
 
@@ -506,7 +513,9 @@ struct EmbeddingsDashboardView: View {
 
     var body: some View {
         List {
-            Section("Overview") {
+            // Overview
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Overview").font(.headline)
                 HStack {
                     Label("Total", systemImage: "number")
                     Spacer()
@@ -533,7 +542,9 @@ struct EmbeddingsDashboardView: View {
                 }
             }
 
-            Section("Sources") {
+            // Sources
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sources").font(.headline)
                 if embeddingsManager.knowledgeSources.isEmpty {
                     Text("No sources yet").foregroundColor(.secondary)
                 } else {
@@ -565,7 +576,9 @@ struct EmbeddingsDashboardView: View {
                 }
             }
 
-            Section("Actions") {
+            // Actions
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Actions").font(.headline)
                 if embeddingsManager.isRebuilding {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Rebuilding all embeddings…")
@@ -582,6 +595,7 @@ struct EmbeddingsDashboardView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Manage Embeddings")
         .navigationBarTitleDisplayMode(.inline)
     }
