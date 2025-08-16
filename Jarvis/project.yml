@@ -1,4 +1,7 @@
-# Jarvis/project.yml — lives inside the Jarvis/ folder
+# Jarvis/project.yml
+# Spec lives inside the Jarvis/ folder.
+# It compiles EVERY Swift file under Sources/AppModule (App, Chat, Models, Privacy, services, Settings, Vision, Voice),
+# links the local Swift package product AppModule, and expects an Info.plist next to JarvisApp.swift.
 
 name: Jarvis
 options:
@@ -11,7 +14,7 @@ settings:
   IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 
 packages:
-  # Local Swift package sits one level up from Jarvis/
+  # Local Swift package with Package.swift at repo root (one level up from Jarvis/)
   appmodule-local:
     path: ..
 
@@ -21,16 +24,17 @@ targets:
     platform: iOS
     deploymentTarget: "17.0"
 
-    # Explicitly include each subfolder you showed, plus a catch‑all for any future subfolders.
+    # Include all source code under Sources/AppModule (recursively)
+    # and also add explicit groups for the subfolders shown in your screenshots.
     sources:
-      # Catch‑all for everything under Sources/AppModule (keeps future folders included)
+      # Catch‑all include
       - path: Sources/AppModule
         name: AppModuleAll
         excludes:
           - "../Scripts/**"
           - "**/*.md"
 
-      # Explicit subfolders from your screenshots (kept mainly for clarity/organization in Xcode)
+      # Explicit subfolders for cleaner grouping in Xcode’s navigator
       - path: Sources/AppModule/App
         name: App
       - path: Sources/AppModule/Chat
@@ -56,13 +60,13 @@ targets:
       SWIFT_VERSION: 5.0
       ENABLE_PREVIEWS: YES
 
-      # Place this file alongside JarvisApp.swift as you planned
+      # Place this file alongside JarvisApp.swift (create it if missing)
       INFOPLIST_FILE: Sources/AppModule/App/Info.plist
 
       # If you later add entitlements:
       # CODE_SIGN_ENTITLEMENTS: Sources/AppModule/App/Jarvis.entitlements
 
-      # If you later link prebuilt libs (e.g., dist/lib), uncomment:
+      # If you later link prebuilt libs, uncomment and customize:
       # LIBRARY_SEARCH_PATHS:
       #   - "$(inherited)"
       #   - "$(PROJECT_DIR)/dist/lib"

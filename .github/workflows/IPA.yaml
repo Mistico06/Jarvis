@@ -1,4 +1,11 @@
-name: Generate Project and Build IPA (AltStore)
+# .github/workflows/build-ipa.yml
+# Full workflow that:
+# 1) Installs XcodeGen
+# 2) Generates Jarvis/Jarvis.xcodeproj from Jarvis/project.yml
+# 3) Archives the app unsigned
+# 4) Packages an unsigned IPA suitable for AltStore
+
+name: Generate Project and Build IPA
 
 on:
   push:
@@ -15,6 +22,13 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Show layout (debug)
+        run: |
+          pwd
+          ls -la
+          echo "--- Jarvis ---"
+          ls -la Jarvis || true
+
       - name: Set up Xcode 16.2
         uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -23,28 +37,33 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode project from project.yml
-        run: xcodegen generate --spec Jarvis/project.yml
+      - name: Generate Xcode project (spec is Jarvis/project.yml)
+        working-directory: Jarvis
+        run: xcodegen generate
+
+      - name: Verify project created
+        run: |
+          ls -la Jarvis
+          test -d Jarvis/Jarvis.xcodeproj || (echo "Missing Jarvis/Jarvis.xcodeproj" && exit 1)
 
       - name: List schemes
-        run: xcodebuild -list
+        run: xcodebuild -list -project Jarvis/Jarvis.xcodeproj
 
       - name: Archive (Release, unsigned)
         env:
-          SCHEME: Jarvis
           ARCHIVE_PATH: ${{ github.workspace }}/build/Jarvis.xcarchive
         run: |
           set -o pipefail
           xcodebuild clean archive \
-            -project Jarvis.xcodeproj \
-            -scheme "$SCHEME" \
+            -project Jarvis/Jarvis.xcodeproj \
+            -scheme Jarvis \
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath "$ARCHIVE_PATH" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGNING_IDENTITY="" \
-            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             ENABLE_BITCODE=NO
-          xcodebuild -showBuildSettings -project Jarvis.xcodeproj -scheme "$SCHEME" > xcodebuild.log 2>&1 || true
+          xcodebuild -showBuildSettings -project Jarvis/Jarvis.xcodeproj -scheme Jarvis > xcodebuild.log 2>&1 || true
 
       - name: Inspect archive contents
         run: |
@@ -60,15 +79,14 @@ jobs:
           echo "Searching for .app under: $APP_DIR"
           APP_PATH="$(find "$APP_DIR" -maxdepth 1 -name "*.app" -print -quit)"
           if [ -z "$APP_PATH" ]; then
-            echo "No .app found. Check that the scheme builds an iOS App and archive succeeded."
+            echo "No .app found. Ensure the scheme builds an iOS App and archive succeeded."
             exit 1
           fi
           echo "Found app: $APP_PATH"
           mkdir -p "$EXPORT_DIR/Payload"
           cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
           xattr -rc "$EXPORT_DIR/Payload"
-          cd "$EXPORT_DIR"
-          /usr/bin/zip -qry "Jarvis-unsigned.ipa" Payload
+          (cd "$EXPORT_DIR" && /usr/bin/zip -qry "Jarvis-unsigned.ipa" Payload)
           ls -la "$EXPORT_DIR"
 
       - name: Upload IPA artifact
