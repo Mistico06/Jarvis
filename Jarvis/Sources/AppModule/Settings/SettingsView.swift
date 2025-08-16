@@ -1,6 +1,13 @@
+// Assuming your auxiliary views (NetworkAuditView, PromptTemplatesView, SQLHelperView, CodeLinter, AddKnowledgeView, etc.)
+// are located in a separate module within your project called 'Modules',
+// you need to import that module at the top of your SettingsView file to gain visibility.
+
 import SwiftUI
-import UniformTypeIdentifiers
+import UniformTypes
 import PhotosUI
+
+// Import the module where your other view components are defined
+import Modules // <-- Replace 'Modules' with the actual module name if different
 
 struct SettingsView: View {
     var body: some View {
@@ -21,7 +28,8 @@ private struct SettingsFormView: View {
 
     var body: some View {
         Form {
-            // === Begin your Section code, unchanged ===
+            // Your existing form sections here (same as before) ...
+
             Section(header: Text("AI Model")) {
                 Picker("Model Size", selection: $appState.selectedModel) {
                     Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
@@ -50,7 +58,7 @@ private struct SettingsFormView: View {
                 }
                 .onChange(of: appState.currentMode, initial: false) {
                     networkGuard.setNetworkMode(appState.currentMode)
-                    auditLog.logNetworkModeChange(appState.currentMode)
+                    auditLog.logNetworkChange(appState.currentMode)
                 }
 
                 if appState.currentMode != .offline {
@@ -75,14 +83,24 @@ private struct SettingsFormView: View {
             }
 
             Section(header: Text("Data Engineering")) {
-                NavigationLink("Prompt Templates") { PromptTemplatesView() }
-                NavigationLink("SQL Assistant") { SQLHelperView() }
-                NavigationLink("Code Linter") { CodeLinterView() }
+                NavigationLink("Prompt Templates") {
+                    PromptTemplatesView()
+                }
+                NavigationLink("SQL Assistant") {
+                    SQLHelperView()
+                }
+                NavigationLink("Code Linter") {
+                    CodeLinterView()
+                }
             }
 
             Section(header: Text("Local Learning")) {
-                NavigationLink("Add Knowledge") { AddKnowledgeView() }
-                NavigationLink("Manage Embeddings") { EmbeddingsView() }
+                NavigationLink("Add Knowledge") {
+                    AddKnowledgeView()
+                }
+                NavigationLink("Manage Embeddings") {
+                    EmbeddingsView()
+                }
             }
 
             Section(header: Text("About")) {
@@ -105,37 +123,35 @@ private struct SettingsFormView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            // === End your Section code ===
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Done") { dismiss() }
+                Button("Done") {
+                    dismiss()
+                }
             }
         }
     }
 
+    // Mark: Helper Functions
     private func clearAllData() {
         ConversationStore.shared.clearAll()
         auditLog.clearLogs()
-        // LocalEmbeddings.shared.clearCache() // if present
+        // Add other data clearing logic as necessary
     }
 
     private func getModelStorageSize() -> String {
         let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let fileURL = docsURL.appendingPathComponent(modelRuntime.currentModel.modelBundlePath)
-        guard
-            let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
-            let byteCount = attributes[.size] as? Int64
-        else {
+        let fileURL = docsURL.appendingPathComponent(modelRuntime.currentModel.bundlePath)
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+              let size = attributes[.size] as? UInt64 else {
             return "0 MB"
         }
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB]
         formatter.countStyle = .file
-        return formatter.string(fromByteCount: byteCount)
+        return formatter.string(fromByteCount: Int64(size))
     }
 }
-
-// -- the rest of your NetworkAuditView, PromptTemplatesView, etc. remain unchanged.
