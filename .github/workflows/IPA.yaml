@@ -24,7 +24,7 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project from project.yml
-        run: xcodegen generate
+        run: xcodegen generate --spec Jarvis/project.yml
 
       - name: List schemes
         run: xcodebuild -list
