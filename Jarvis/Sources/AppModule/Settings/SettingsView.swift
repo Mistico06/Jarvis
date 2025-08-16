@@ -24,7 +24,7 @@ private struct SettingsFormView: View {
     var body: some View {
         Form {
             // MARK: AI Model
-            Section {
+            Section("AI Model") {
                 Picker("AI Model Size", selection: $appState.selectedModel) {
                     Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
                     Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
@@ -41,12 +41,10 @@ private struct SettingsFormView: View {
                             .foregroundColor(.secondary)
                     }
                 }
-            } header: {
-                Text("AI Model")
             }
 
             // MARK: Network Modes
-            Section {
+            Section("Network Modes") {
                 Picker("Network Mode", selection: $appState.currentMode) {
                     Label("Offline", systemImage: "wifi.slash").tag(AppState.AppMode.offline)
                     Label("Quick Search", systemImage: "magnifyingglass").tag(AppState.AppMode.quickSearch)
@@ -67,38 +65,30 @@ private struct SettingsFormView: View {
                             .foregroundColor(.orange)
                     }
                 }
-            } header: {
-                Text("Network Modes")
             }
 
             // MARK: Privacy & Security
-            Section {
+            Section("Privacy & Security") {
                 NavigationLink("Network Audit Log") { NetworkAuditView() }
                 Button("Clear All Data") { clearAllData() }
                     .foregroundColor(.red)
-            } header: {
-                Text("Privacy & Security")
             }
 
             // MARK: Data Engineering
-            Section {
+            Section("Data Engineering") {
                 NavigationLink("Prompt Templates") { PromptTemplatesView() }
                 NavigationLink("SQL Assistant") { SQLHelperView() }
                 NavigationLink("Code Linter") { CodeLinterView() }
-            } header: {
-                Text("Data Engineering")
             }
 
             // MARK: Local Learning
-            Section {
+            Section("Local Learning") {
                 NavigationLink("Add Knowledge") { AddKnowledgeView() }
                 NavigationLink("Manage Embeddings") { EmbeddingsDashboardView() }
-            } header: {
-                Text("Local Learning")
             }
 
             // MARK: About
-            Section {
+            Section("About") {
                 HStack {
                     Text("Version")
                     Spacer()
@@ -117,8 +107,6 @@ private struct SettingsFormView: View {
                     Text(getModelSize())
                         .foregroundColor(.secondary)
                 }
-            } header: {
-                Text("About")
             }
         }
         .navigationTitle("Settings")
@@ -147,7 +135,7 @@ struct NetworkAuditView: View {
 
     var body: some View {
         List {
-            Section {
+            Section("Recent Activity") {
                 if auditLog.networkLogs.isEmpty {
                     Text("No audit records available").foregroundColor(.secondary)
                 } else {
@@ -164,15 +152,11 @@ struct NetworkAuditView: View {
                         }
                     }
                 }
-            } header: {
-                Text("Recent Activity")
             }
 
-            Section {
+            Section("Actions") {
                 Button("Clear Audit Log") { auditLog.clearLogs() }
                     .foregroundColor(.red)
-            } header: {
-                Text("Actions")
             }
         }
         .navigationTitle("Network Audit")
@@ -188,7 +172,7 @@ struct PromptTemplatesView: View {
 
     var body: some View {
         List {
-            Section {
+            Section("Templates") {
                 if manager.templates.isEmpty {
                     Text("No templates yet").foregroundColor(.secondary)
                 } else {
@@ -216,16 +200,12 @@ struct PromptTemplatesView: View {
                     }
                     .onDelete { offsets in manager.remove(atOffsets: offsets) }
                 }
-            } header: {
-                Text("Templates")
             }
 
-            Section {
+            Section("Actions") {
                 Button("Add Template") { showAddSheet = true }
                 Button("Import Templates") { showImporter = true }
                 Button("Export Templates") { manager.exportTemplates() }
-            } header: {
-                Text("Actions")
             }
         }
         .navigationTitle("Prompt Templates")
@@ -289,12 +269,10 @@ struct SQLHelperView: View {
 
     var body: some View {
         Form {
-            Section {
+            Section("SQL Query") {
                 TextEditor(text: $query)
                     .frame(minHeight: 100)
                     .font(.system(.body, design: .monospaced))
-            } header: {
-                Text("SQL Query")
             }
 
             Section {
@@ -306,7 +284,7 @@ struct SQLHelperView: View {
                 }
             }
 
-            Section {
+            Section("Results") {
                 if errorMessage.isEmpty {
                     ScrollView {
                         Text(result)
@@ -317,8 +295,6 @@ struct SQLHelperView: View {
                 } else {
                     Text(errorMessage).foregroundColor(.red)
                 }
-            } header: {
-                Text("Results")
             }
         }
         .navigationTitle("SQL Assistant")
@@ -363,21 +339,17 @@ struct CodeLinterView: View {
 
     var body: some View {
         Form {
-            Section {
+            Section("Language") {
                 Picker("Language", selection: $language) {
                     ForEach(languages, id: \.self) { lang in Text(lang) }
                 }
                 .pickerStyle(.menu)
-            } header: {
-                Text("Language")
             }
 
-            Section {
+            Section("Code") {
                 TextEditor(text: $code)
                     .frame(minHeight: 200)
                     .font(.system(.body, design: .monospaced))
-            } header: {
-                Text("Code")
             }
 
             Section {
@@ -389,14 +361,12 @@ struct CodeLinterView: View {
                 }
             }
 
-            Section {
+            Section("Results") {
                 if lintResults.isEmpty {
                     Text("No results yet").foregroundColor(.secondary)
                 } else {
                     ForEach(lintResults, id: \.self) { issue in Text(issue) }
                 }
-            } header: {
-                Text("Results")
             }
         }
         .navigationTitle("Code Linter")
@@ -536,7 +506,7 @@ struct EmbeddingsDashboardView: View {
 
     var body: some View {
         List {
-            Section {
+            Section("Overview") {
                 HStack {
                     Label("Total", systemImage: "number")
                     Spacer()
@@ -561,11 +531,9 @@ struct EmbeddingsDashboardView: View {
                     Text(relativeLastUpdated)
                         .foregroundColor(.secondary)
                 }
-            } header: {
-                Text("Overview")
             }
 
-            Section {
+            Section("Sources") {
                 if embeddingsManager.knowledgeSources.isEmpty {
                     Text("No sources yet").foregroundColor(.secondary)
                 } else {
@@ -595,11 +563,9 @@ struct EmbeddingsDashboardView: View {
                         .padding(.vertical, 2)
                     }
                 }
-            } header: {
-                Text("Sources")
             }
 
-            Section {
+            Section("Actions") {
                 if embeddingsManager.isRebuilding {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Rebuilding all embeddings…")
@@ -614,8 +580,6 @@ struct EmbeddingsDashboardView: View {
                         embeddingsManager.clearAllEmbeddings()
                     }
                 }
-            } header: {
-                Text("Actions")
             }
         }
         .navigationTitle("Manage Embeddings")
