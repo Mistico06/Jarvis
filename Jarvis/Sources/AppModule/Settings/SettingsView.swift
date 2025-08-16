@@ -3,7 +3,7 @@
 // you need to import that module at the top of your SettingsView file to gain visibility.
 
 import SwiftUI
-import UniformTypes
+import UniformTypeIdentifiers
 import PhotosUI
 
 // Import the module where your other view components are defined
