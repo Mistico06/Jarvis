@@ -51,8 +51,28 @@ jobs:
           xcodebuild -showBuildSettings -scheme "$SCHEME" > xcodebuild.log 2>&1 || true
           exit ${EXIT_CODE:-0}
 
-      # Export an unsigned .ipa suitable for AltStore (no ExportOptions.plist)
-      - name: Export IPA (unsigned)
+      # Create a valid iOS ExportOptions.plist (ad-hoc), but keep signing disabled
+      - name: Create ExportOptions.plist (ad-hoc, unsigned)
+        working-directory: Jarvis
+        run: |
+          cat > ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>ad-hoc</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>destination</key><string>export</string>
+            <key>stripSwiftSymbols</key><true/>
+            <key>compileBitcode</key><false/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>thinning</key><string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+
+      # Export an IPA using the plist while keeping signing disabled (AltStore will re-sign)
+      - name: Export IPA (ad-hoc plist, signing disabled)
         working-directory: Jarvis
         env:
           ARCHIVE_PATH: ${{ github.workspace }}/Jarvis/build/Jarvis.xcarchive
@@ -63,6 +83,7 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportPath "$EXPORT_DIR" \
+            -exportOptionsPlist ExportOptions.plist \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_IDENTITY="" \
