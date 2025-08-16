@@ -10,18 +10,18 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Debug layout
         run: |
-          echo "== Repo root =="
-          pwd
+          echo "== Repo root ==" && pwd
           ls -la
-          echo "== Jarvis dir =="
-          ls -la Jarvis || true
+          echo "== Jarvis dir ==" && ls -la Jarvis || true
+          echo "== Submodule dir ==" && ls -la external || true
+          ls -la external/mlcllm || true
           echo "== Key files =="
           test -f Jarvis/project.yml && echo "Jarvis/project.yml: OK" || echo "Jarvis/project.yml: MISSING"
           test -f Jarvis/Package.swift && echo "Jarvis/Package.swift: OK" || echo "Jarvis/Package.swift: MISSING"
@@ -32,28 +32,54 @@ jobs:
         with:
           xcode-version: "16.2"
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      # If you keep the native libs in another repo, fetch and copy them here.
-      # Adjust the source paths below to match that repo's structure.
-      - name: Fetch mlc-llm native artifacts (prebuilt) for iOS
+      - name: Install build tools (CMake, Rustup) and XcodeGen
         run: |
-          set -e
-          git clone --depth=1 https://github.com/Mistico06/mlc-llm.git external/mlc-llm
+          brew install cmake xcodegen rustup-init || true
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "Initializing rustup..."
+            rustup-init -y
+          fi
+          echo 'source $HOME/.cargo/env' >> $GITHUB_ENV
+
+      - name: Build mlc-llm iOS device static libs (arm64)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          source $HOME/.cargo/env
+          cd external/mlcllm/ios
+          chmod +x prepare_libs.sh
+          ./prepare_libs.sh
+          echo "== Built static libs =="
+          find build -maxdepth 3 -type f -name "*.a" -print || true
+
+      - name: Stage mlc-llm libs and bundle into Jarvis/dist
+        run: |
+          set -euxo pipefail
           mkdir -p Jarvis/dist/lib Jarvis/dist/bundle
-          # Copy native libraries (update source dir as needed)
-          if [ -d external/mlc-llm/prebuilt/ios/lib ]; then
-            cp -R external/mlc-llm/prebuilt/ios/lib/* Jarvis/dist/lib/ || true
+
+          # Copy all installed static libs from the submodule build.
+          # Adjust the source path below if your install layout differs.
+          if [ -d external/mlcllm/ios/build/lib ]; then
+            cp -R external/mlcllm/ios/build/lib/*.a Jarvis/dist/lib/ || true
           fi
-          # Copy runtime assets (update source dir as needed)
-          if [ -d external/mlc-llm/prebuilt/ios/bundle ]; then
-            cp -R external/mlc-llm/prebuilt/ios/bundle/* Jarvis/dist/bundle/ || true
+
+          # Optionally copy runtime bundle assets if your pipeline generates them elsewhere in the submodule
+          # Example paths (adjust/remove as needed):
+          if [ -d external/mlcllm/ios/prebuilt/bundle ]; then
+            cp -R external/mlcllm/ios/prebuilt/bundle/* Jarvis/dist/bundle/ || true
           fi
+          if [ -d external/mlcllm/ios/MLCGen/output/bundle ]; then
+            cp -R external/mlcllm/ios/MLCGen/output/bundle/* Jarvis/dist/bundle/ || true
+          fi
+
           echo "== Dist lib =="
           ls -la Jarvis/dist/lib || true
           echo "== Dist bundle =="
           ls -la Jarvis/dist/bundle || true
+          echo "== Architectures of libs =="
+          for f in Jarvis/dist/lib/*.a; do
+            [ -f "$f" ] && (file "$f" || true; lipo -info "$f" || true)
+          done
 
       - name: Clean any stale project
         run: rm -rf Jarvis/Jarvis.xcodeproj
@@ -61,17 +87,6 @@ jobs:
       - name: Generate Xcode project (run inside Jarvis/)
         working-directory: Jarvis
         run: xcodegen generate
-
-      - name: Verify project and artifacts
-        run: |
-          set -e
-          test -d Jarvis/Jarvis.xcodeproj || (echo "Missing Jarvis/Jarvis.xcodeproj" && exit 1)
-          test -f Jarvis/Package.swift || (echo "Missing Jarvis/Package.swift" && exit 1)
-          test -f Jarvis/Sources/AppModule/App/Info.plist || (echo "Missing Info.plist" && exit 1)
-          echo "== Native libs (optional but expected if you use MLCSwift) =="
-          ls -la Jarvis/dist/lib || true
-          echo "== Runtime bundle (optional) =="
-          ls -la Jarvis/dist/bundle || true
 
       - name: List schemes
         run: xcodebuild -list -project Jarvis/Jarvis.xcodeproj
@@ -114,13 +129,11 @@ jobs:
         run: |
           set -o pipefail
           APP_DIR="$ARCHIVE_PATH/Products/Applications"
-          echo "Searching for .app under: $APP_DIR"
           APP_PATH="$(find "$APP_DIR" -maxdepth 1 -name "*.app" -print -quit)"
           if [ -z "$APP_PATH" ]; then
             echo "No .app found. Ensure the scheme builds an iOS App and archive succeeded."
             exit 1
           fi
-          echo "Found app: $APP_PATH"
           mkdir -p "$EXPORT_DIR/Payload"
           cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
           xattr -rc "$EXPORT_DIR/Payload"
