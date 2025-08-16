@@ -2,8 +2,6 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PhotosUI
 
-// iOS 17: Keep toolbar simple at the NavigationStack scope. If any ambiguity appears,
-// you can still use the TrailingDoneToolbar helper pattern shown previously.
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var modelRuntime: ModelRuntime
@@ -23,7 +21,6 @@ struct SettingsView: View {
                         Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
                         Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
                     }
-                    // iOS 17: parameterless variant allowed; read current state inside
                     .onChange(of: appState.selectedModel, initial: false) {
                         Task { await modelRuntime.switchModel(to: appState.selectedModel) }
                     }
@@ -110,10 +107,10 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") { dismiss() }
             }
         }
     }
@@ -223,7 +220,6 @@ struct PromptTemplatesView: View {
 
     private var allowedTemplateTypes: [UTType] {
         var types: [UTType] = [.json, .text]
-        // iOS 17: UTType(importedAs:) returns non-optional UTType
         types.append(UTType(importedAs: "net.daringfireball.markdown"))
         return types
     }
