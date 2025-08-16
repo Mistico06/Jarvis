@@ -23,11 +23,13 @@ private struct SettingsFormView: View {
 
     var body: some View {
         Form {
+            // MARK: AI Model
             Section("AI Model") {
                 Picker("AI Model Size", selection: $appState.selectedModel) {
                     Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
                     Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
-                }.onChange(of: appState.selectedModel, initial: false) {
+                }
+                .onChange(of: appState.selectedModel, initial: false) {
                     Task { await modelRuntime.switchModel(to: appState.selectedModel) }
                 }
 
@@ -40,17 +42,20 @@ private struct SettingsFormView: View {
                     }
                 }
             }
-            
+
+            // MARK: Network Modes
             Section("Network Modes") {
                 Picker("Network Mode", selection: $appState.currentMode) {
                     Label("Offline", systemImage: "wifi.slash").tag(AppState.AppMode.offline)
                     Label("Quick Search", systemImage: "magnifyingglass").tag(AppState.AppMode.quickSearch)
                     Label("Deep Research", systemImage: "doc.text.magnifyingglass").tag(AppState.AppMode.deepResearch)
                     Label("Voice Control", systemImage: "mic").tag(AppState.AppMode.voiceControl)
-                }.onChange(of: appState.currentMode, initial: false) {
-                    networkGuard.setNetworkMode($0)
-                    auditLog.logNetworkChange($0)
                 }
+                .onChange(of: appState.currentMode, initial: false) { newMode in
+                    networkGuard.setNetworkMode(newMode)
+                    auditLog.logNetworkModeChange(newMode)
+                }
+
                 if appState.currentMode != .offline {
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
@@ -61,7 +66,8 @@ private struct SettingsFormView: View {
                     }
                 }
             }
-            
+
+            // MARK: Privacy & Security
             Section("Privacy & Security") {
                 NavigationLink("Network Audit Log") {
                     NetworkAuditView()
@@ -71,7 +77,8 @@ private struct SettingsFormView: View {
                 }
                 .foregroundColor(.red)
             }
-            
+
+            // MARK: Data Engineering
             Section("Data Engineering") {
                 NavigationLink("Prompt Templates") {
                     PromptTemplatesView()
@@ -83,16 +90,19 @@ private struct SettingsFormView: View {
                     CodeLinterView()
                 }
             }
-            
+
+            // MARK: Local Learning
             Section("Local Learning") {
                 NavigationLink("Add Knowledge") {
                     AddKnowledgeView()
                 }
                 NavigationLink("Manage Embeddings") {
+                    // Keep a single EmbeddingsView definition in its own file to avoid redeclaration
                     EmbeddingsView()
                 }
             }
-            
+
+            // MARK: About
             Section("About") {
                 HStack {
                     Text("Version")
@@ -126,25 +136,18 @@ private struct SettingsFormView: View {
     private func clearAllData() {
         ConversationStore.shared.clearAll()
         auditLog.clearLogs()
-        // Consider clearing caches or other persistence if needed
+        // Clear any additional caches if needed
     }
 
+    // Placeholder; adjust to your ModelRuntime as needed
     private func getModelSize() -> String {
-        let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        // Adjust this path according to your ModelRuntime implementation
-        let fileURL = docsURL.appendingPathComponent(modelRuntime.currentModel.bundleFilePath)
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
-              let size = attrs[.size] as? UInt64 else {
-            return "N/A"
-        }
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useMB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: Int64(size))
+        // If you have a concrete file path for the active model, compute size there.
+        // Returning N/A avoids compile-time issues until wired to a real path.
+        return "N/A"
     }
 }
 
-// MARK: - NetworkAuditView Implementation
+// MARK: - NetworkAuditView
 struct NetworkAuditView: View {
     @EnvironmentObject private var auditLog: AuditLog
 
@@ -152,10 +155,18 @@ struct NetworkAuditView: View {
         List {
             Section("Recent Activity") {
                 if auditLog.entries.isEmpty {
-                    Text("No audit records available").foregroundColor(.secondary)
+                    Text("No audit records available")
+                        .foregroundColor(.secondary)
                 } else {
                     ForEach(auditLog.entries) { entry in
-                        Text(entry.description)
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let title = entry.title, !title.isEmpty {
+                                Text(title).font(.headline)
+                            }
+                            Text(entry.description)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
@@ -171,7 +182,7 @@ struct NetworkAuditView: View {
     }
 }
 
-// MARK: - PromptTemplatesView Implementation
+// MARK: - PromptTemplatesView
 struct PromptTemplatesView: View {
     @StateObject private var manager = PromptTemplateManager.shared
     @State private var showAddSheet = false
@@ -184,9 +195,20 @@ struct PromptTemplatesView: View {
                     Text("No templates yet").foregroundColor(.secondary)
                 } else {
                     ForEach(manager.templates) { template in
-                        VStack(alignment: .leading) {
-                            Text(template.name).bold()
-                            Text(template.content).foregroundColor(.secondary).lineLimit(2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(template.name).font(.headline)
+                                Spacer()
+                                Button("Use") {
+                                    manager.useTemplate(template)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                            Text(template.content)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                                .font(.caption)
                         }
                     }
                     .onDelete { indices in
@@ -197,16 +219,17 @@ struct PromptTemplatesView: View {
             Section("Actions") {
                 Button("Add Template") { showAddSheet = true }
                 Button("Import Templates") { showImporter = true }
-                Button("Export Templates") {
-                    manager.exportTemplates()
-                }
+                Button("Export Templates") { manager.exportTemplates() }
             }
         }
         .navigationTitle("Prompt Templates")
-        .sheet(isPresented: $showAddSheet) {
-            AddTemplateView()
-        }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .plainText, .init("net.daringfireball.markdown")], allowsMultipleSelection: false) { result in
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showAddSheet) { AddTemplateView() }
+        .fileImporter(
+            isPresented: $showImporter,
+            allowedContentTypes: [.json, .plainText, UTType(importedAs: "net.daringfireball.markdown")],
+            allowsMultipleSelection: false
+        ) { result in
             manager.importTemplates(from: result)
         }
     }
@@ -217,7 +240,7 @@ struct AddTemplateView: View {
     @State private var name = ""
     @State private var category = "General"
     @State private var content = ""
-    let categories = ["General", "Code", "SQL", "Analysis", "Creative"]
+    private let categories = ["General", "Code", "SQL", "Analysis", "Creative"]
 
     var body: some View {
         NavigationView {
@@ -228,16 +251,23 @@ struct AddTemplateView: View {
                         Text(c)
                     }
                 }
-                TextEditor(text: $content)
-                    .frame(minHeight: 200)
+                VStack(alignment: .leading) {
+                    Text("Content").font(.headline)
+                    TextEditor(text: $content).frame(minHeight: 200)
+                }
             }
             .navigationTitle("Add Template")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        // Add save functionality
+                        PromptTemplateManager.shared.addTemplate(
+                            name: name,
+                            content: content,
+                            category: category
+                        )
                         dismiss()
-                    }.disabled(name.isEmpty || content.isEmpty)
+                    }
+                    .disabled(name.isEmpty || content.isEmpty)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -247,7 +277,7 @@ struct AddTemplateView: View {
     }
 }
 
-// MARK: - SQLHelperView Implementation
+// MARK: - SQLHelperView
 struct SQLHelperView: View {
     @State private var query = ""
     @State private var result = ""
@@ -258,14 +288,15 @@ struct SQLHelperView: View {
             Section("SQL Query") {
                 TextEditor(text: $query)
                     .frame(minHeight: 100)
+                    .font(.system(.body, design: .monospaced))
             }
             Section {
                 HStack {
                     Button("Validate") {
-                        // Add validation logic here
+                        // TODO: validate query
                     }
                     Button("Execute") {
-                        // Add execution logic here
+                        // TODO: execute query
                     }
                 }
             }
@@ -277,16 +308,16 @@ struct SQLHelperView: View {
                     }
                     .frame(minHeight: 200)
                 } else {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
+                    Text(errorMessage).foregroundColor(.red)
                 }
             }
         }
         .navigationTitle("SQL Assistant")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-// MARK: - CodeLinterView Implementation
+// MARK: - CodeLinterView
 struct CodeLinterView: View {
     @State private var code = ""
     @State private var lintResults: [String] = []
@@ -300,8 +331,10 @@ struct CodeLinterView: View {
             }
             Section {
                 Button("Lint") {
-                    // Add lint logic here
-                    lintResults = ["No issues found"] // Placeholder
+                    // TODO: integrate with CodeLinter
+                    lintResults = code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? ["No code entered"]
+                        : ["No issues found"]
                 }
             }
             Section("Results") {
@@ -311,62 +344,44 @@ struct CodeLinterView: View {
             }
         }
         .navigationTitle("Code Linter")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-// MARK: - AddKnowledgeView Implementation
+// MARK: - AddKnowledgeView
 struct AddKnowledgeView: View {
     @State private var selectedFiles: [URL] = []
     @State private var isProcessing = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack {
+        VStack(spacing: 16) {
             Text("Add Knowledge")
-                .font(.largeTitle)
-                .padding()
+                .font(.title2)
+                .fontWeight(.semibold)
 
             Button("Select Documents") {
-                // Open document picker
+                // TODO: present document picker
             }
-            .padding()
+            .buttonStyle(.borderedProminent)
 
             if isProcessing {
-                ProgressView("Processing...")
-                    .padding()
+                ProgressView("Processing...").padding(.top, 8)
             }
 
-            List(selectedFiles, id: \.self) { file in
-                Text(file.lastPathComponent)
+            if !selectedFiles.isEmpty {
+                List(selectedFiles, id: \.self) { file in
+                    Text(file.lastPathComponent)
+                }
+                .frame(minHeight: 150)
             }
 
             Spacer()
 
             Button("Close") { dismiss() }
-                .padding()
         }
         .padding()
-    }
-}
-
-// MARK: - EmbeddingsView Implementation
-struct EmbeddingsView: View {
-    @EnvironmentObject private var embeddingsManager: EmbeddingsManager
-
-    var body: some View {
-        List {
-            if embeddingsManager.items.isEmpty {
-                Text("No embeddings added yet")
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(embeddingsManager.items) { item in
-                    Text(item.name)
-                }
-                .onDelete { indices in
-                    embeddingsManager.remove(atOffsets: indices)
-                }
-            }
-        }
-        .navigationTitle("Manage Embeddings")
+        .navigationTitle("Add Knowledge")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
