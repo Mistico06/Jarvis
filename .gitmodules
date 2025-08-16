@@ -1,3 +1,6 @@
 [submodule "Jarvis/ThirdParty/mlc-llm"]
 	path = Jarvis/ThirdParty/mlc-llm
 	url = https://github.com/mlc-ai/mlc-llm.git
+[submodule "external/mlcllm"]
+	path = external/mlcllm
+	url = https://github.com/mlc-ai/mlc-llm.git
