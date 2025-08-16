@@ -27,11 +27,10 @@ jobs:
         working-directory: Jarvis
         run: xcodebuild -list
 
-      # Build + Archive (unsigned) for generic iOS device
       - name: Archive (Release, unsigned)
         working-directory: Jarvis
         env:
-          SCHEME: Jarvis           # <-- Change if your scheme differs
+          SCHEME: Jarvis
           ARCHIVE_PATH: ${{ github.workspace }}/Jarvis/build/Jarvis.xcarchive
         run: |
           set -o pipefail
@@ -47,55 +46,32 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             ENABLE_BITCODE=NO \
             | xcbeautify --renderer github-actions || EXIT_CODE=$?
-          # Save a build settings snapshot for debugging
           xcodebuild -showBuildSettings -scheme "$SCHEME" > xcodebuild.log 2>&1 || true
           exit ${EXIT_CODE:-0}
 
-      # Create a valid iOS ExportOptions.plist (ad-hoc), but keep signing disabled
-      - name: Create ExportOptions.plist (ad-hoc, unsigned)
-        working-directory: Jarvis
-        run: |
-          cat > ExportOptions.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>ad-hoc</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>destination</key><string>export</string>
-            <key>stripSwiftSymbols</key><true/>
-            <key>compileBitcode</key><false/>
-            <key>manageAppVersionAndBuildNumber</key><false/>
-            <key>thinning</key><string>&lt;none&gt;</string>
-          </dict>
-          </plist>
-          EOF
-
-      # Export an IPA using the plist while keeping signing disabled (AltStore will re-sign)
-      - name: Export IPA (ad-hoc plist, signing disabled)
+      - name: Create IPA manually (no exportArchive)
         working-directory: Jarvis
         env:
           ARCHIVE_PATH: ${{ github.workspace }}/Jarvis/build/Jarvis.xcarchive
           EXPORT_DIR: ${{ github.workspace }}/Jarvis/build/export
         run: |
           set -o pipefail
-          mkdir -p "$EXPORT_DIR"
-          xcodebuild -exportArchive \
-            -archivePath "$ARCHIVE_PATH" \
-            -exportPath "$EXPORT_DIR" \
-            -exportOptionsPlist ExportOptions.plist \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_IDENTITY="" \
-            | tee export.log
-          echo "Exported files:"
+          mkdir -p "$EXPORT_DIR/Payload"
+          # Copy .app from archive into Payload
+          cp -R "$ARCHIVE_PATH/Products/Applications/"*.app "$EXPORT_DIR/Payload/"
+          # Clean extended attributes
+          xattr -rc "$EXPORT_DIR/Payload"
+          # Zip Payload into IPA
+          cd "$EXPORT_DIR"
+          /usr/bin/zip -qry "Jarvis-unsigned.ipa" Payload
+          echo "IPA created at: $EXPORT_DIR/Jarvis-unsigned.ipa"
           ls -la "$EXPORT_DIR"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-ipa
-          path: Jarvis/build/export/*.ipa
+          path: Jarvis/build/export/Jarvis-unsigned.ipa
           if-no-files-found: error
 
       - name: Upload logs
@@ -105,13 +81,3 @@ jobs:
           name: build-logs
           path: |
             Jarvis/xcodebuild.log
-            Jarvis/export.log
-
-      - name: Show compilation errors if build failed
-        if: failure()
-        working-directory: Jarvis
-        run: |
-          echo "=== COMPILATION ERRORS ==="
-          grep -A 8 -B 8 "error:" xcodebuild.log || true
-          echo "=== FATAL ERRORS ==="
-          grep -A 8 -B 8 "fatal error:" xcodebuild.log || true
