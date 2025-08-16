@@ -27,14 +27,31 @@ jobs:
         working-directory: Jarvis
         run: xcodebuild -list
 
+      # Choose ONE of these: set WORKSPACE or PROJECT (leave the other empty)
+      - name: Set build context
+        id: ctx
+        run: |
+          echo "WORKSPACE=YourApp.xcworkspace" >> $GITHUB_OUTPUT   # if you have a workspace
+          # echo "PROJECT=YourApp.xcodeproj" >> $GITHUB_OUTPUT      # if you only have a project
+
       - name: Archive (Release, unsigned)
         working-directory: Jarvis
         env:
           SCHEME: Jarvis
           ARCHIVE_PATH: ${{ github.workspace }}/Jarvis/build/Jarvis.xcarchive
+          WORKSPACE: ${{ steps.ctx.outputs.WORKSPACE }}
+          PROJECT: ${{ steps.ctx.outputs.PROJECT }}
         run: |
           set -o pipefail
+          if [ -n "$WORKSPACE" ]; then
+            WS_ARG=(-workspace "$WORKSPACE")
+          elif [ -n "$PROJECT" ]; then
+            WS_ARG=(-project "$PROJECT")
+          else
+            WS_ARG=()
+          fi
           xcodebuild clean archive \
+            "${WS_ARG[@]}" \
             -scheme "$SCHEME" \
             -configuration Release \
             -destination "generic/platform=iOS" \
@@ -49,19 +66,34 @@ jobs:
           xcodebuild -showBuildSettings -scheme "$SCHEME" > xcodebuild.log 2>&1 || true
           exit ${EXIT_CODE:-0}
 
-      - name: Create IPA manually (no exportArchive)
+      - name: Inspect archive contents
+        working-directory: Jarvis
+        env:
+          ARCHIVE_PATH: ${{ github.workspace }}/Jarvis/build/Jarvis.xcarchive
+        run: |
+          echo "Info.plist:"
+          /usr/libexec/PlistBuddy -c 'Print' "$ARCHIVE_PATH/Info.plist" || true
+          echo "Products tree:"
+          find "$ARCHIVE_PATH/Products" -maxdepth 3 -print || true
+
+      - name: Create IPA manually (discover .app)
         working-directory: Jarvis
         env:
           ARCHIVE_PATH: ${{ github.workspace }}/Jarvis/build/Jarvis.xcarchive
           EXPORT_DIR: ${{ github.workspace }}/Jarvis/build/export
         run: |
           set -o pipefail
+          APP_DIR="$ARCHIVE_PATH/Products/Applications"
+          echo "Searching for .app under: $APP_DIR"
+          APP_PATH="$(find "$APP_DIR" -name "*.app" -maxdepth 1 -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found in archive. Check scheme/target and archive step."
+            exit 1
+          fi
+          echo "Found app: $APP_PATH"
           mkdir -p "$EXPORT_DIR/Payload"
-          # Copy .app from archive into Payload
-          cp -R "$ARCHIVE_PATH/Products/Applications/"*.app "$EXPORT_DIR/Payload/"
-          # Clean extended attributes
+          cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
           xattr -rc "$EXPORT_DIR/Payload"
-          # Zip Payload into IPA
           cd "$EXPORT_DIR"
           /usr/bin/zip -qry "Jarvis-unsigned.ipa" Payload
           echo "IPA created at: $EXPORT_DIR/Jarvis-unsigned.ipa"
@@ -79,5 +111,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-logs
-          path: |
-            Jarvis/xcodebuild.log
+          path: Jarvis/xcodebuild.log
