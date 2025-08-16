@@ -129,7 +129,7 @@ private struct SettingsFormView: View {
     private func getModelSize() -> String { "N/A" }
 }
 
-// MARK: - Network Audit (avoid Section overload issues by using VStack headers in List)
+// MARK: - Network Audit (VStack headers in List to avoid Section overload issues)
 struct NetworkAuditView: View {
     @EnvironmentObject private var auditLog: AuditLog
 
@@ -167,7 +167,7 @@ struct NetworkAuditView: View {
     }
 }
 
-// MARK: - Prompt Templates (use VStack headers in List to avoid Section ambiguity)
+// MARK: - Prompt Templates (VStack headers; fixed onDelete to use deleteTemplate)
 struct PromptTemplatesView: View {
     @StateObject private var manager = PromptTemplateManager.shared
     @State private var showAddSheet = false
@@ -203,7 +203,10 @@ struct PromptTemplatesView: View {
                         }
                         .padding(.vertical, 2)
                     }
-                    .onDelete { offsets in manager.remove(atOffsets: offsets) }
+                    .onDelete { offsets in
+                        let items = offsets.map { manager.templates[$0] }
+                        items.forEach { manager.deleteTemplate($0) }
+                    }
                 }
             }
 
@@ -407,7 +410,7 @@ struct CodeLinterView: View {
     }
 }
 
-// MARK: - Add Knowledge (standalone VStack; no List Sections)
+// MARK: - Add Knowledge (standalone VStack to avoid List Section overloads)
 struct AddKnowledgeView: View {
     @State private var selectedFiles: [URL] = []
     @State private var isProcessing = false
@@ -498,7 +501,7 @@ struct AddKnowledgeView: View {
     }
 }
 
-// MARK: - Embeddings Dashboard (no List Sections to avoid overloads)
+// MARK: - Embeddings Dashboard (List with VStack headers)
 struct EmbeddingsDashboardView: View {
     @EnvironmentObject private var embeddingsManager: EmbeddingsManager
 
