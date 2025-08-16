@@ -24,12 +24,11 @@ private struct SettingsFormView: View {
     var body: some View {
         Form {
             // MARK: AI Model
-            Section(header: Text("AI Model")) {
+            Section {
                 Picker("AI Model Size", selection: $appState.selectedModel) {
                     Text("Lite (3B) – Faster").tag(ModelRuntime.ModelSize.lite)
                     Text("Max (4B) – Smarter").tag(ModelRuntime.ModelSize.max)
                 }
-                // iOS 17 target is fine with either; use the clearer single-arg variant
                 .onChange(of: appState.selectedModel) { newValue in
                     Task { await modelRuntime.switchModel(to: newValue) }
                 }
@@ -42,10 +41,12 @@ private struct SettingsFormView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+            } header: {
+                Text("AI Model")
             }
 
             // MARK: Network Modes
-            Section(header: Text("Network Modes")) {
+            Section {
                 Picker("Network Mode", selection: $appState.currentMode) {
                     Label("Offline", systemImage: "wifi.slash").tag(AppState.AppMode.offline)
                     Label("Quick Search", systemImage: "magnifyingglass").tag(AppState.AppMode.quickSearch)
@@ -66,34 +67,38 @@ private struct SettingsFormView: View {
                             .foregroundColor(.orange)
                     }
                 }
+            } header: {
+                Text("Network Modes")
             }
 
             // MARK: Privacy & Security
-            Section(header: Text("Privacy & Security")) {
-                NavigationLink("Network Audit Log") {
-                    NetworkAuditView()
-                }
-                Button("Clear All Data") {
-                    clearAllData()
-                }
-                .foregroundColor(.red)
+            Section {
+                NavigationLink("Network Audit Log") { NetworkAuditView() }
+                Button("Clear All Data") { clearAllData() }
+                    .foregroundColor(.red)
+            } header: {
+                Text("Privacy & Security")
             }
 
             // MARK: Data Engineering
-            Section(header: Text("Data Engineering")) {
+            Section {
                 NavigationLink("Prompt Templates") { PromptTemplatesView() }
                 NavigationLink("SQL Assistant") { SQLHelperView() }
                 NavigationLink("Code Linter") { CodeLinterView() }
+            } header: {
+                Text("Data Engineering")
             }
 
             // MARK: Local Learning
-            Section(header: Text("Local Learning")) {
+            Section {
                 NavigationLink("Add Knowledge") { AddKnowledgeView() }
-                NavigationLink("Manage Embeddings") { EmbeddingsDashboardView() } // Uses your EmbeddingsManager API
+                NavigationLink("Manage Embeddings") { EmbeddingsDashboardView() }
+            } header: {
+                Text("Local Learning")
             }
 
             // MARK: About
-            Section(header: Text("About")) {
+            Section {
                 HStack {
                     Text("Version")
                     Spacer()
@@ -112,6 +117,8 @@ private struct SettingsFormView: View {
                     Text(getModelSize())
                         .foregroundColor(.secondary)
                 }
+            } header: {
+                Text("About")
             }
         }
         .navigationTitle("Settings")
@@ -126,28 +133,23 @@ private struct SettingsFormView: View {
     private func clearAllData() {
         ConversationStore.shared.clearAll()
         auditLog.clearLogs()
-        // Your EmbeddingsManager API provides a clearing method:
         embeddingsManager.clearAllEmbeddings()
         knowledgeManager.clearSelection()
     }
 
-    // Wire up to your runtime when you expose an actual URL/path; show N/A for now
-    private func getModelSize() -> String {
-        "N/A"
-    }
+    // Wire to a concrete URL/path in ModelRuntime when available
+    private func getModelSize() -> String { "N/A" }
 }
 
-// MARK: - Network Audit (aligned to your AuditLog API)
+// MARK: - Network Audit (uses AuditLog.networkLogs)
 struct NetworkAuditView: View {
     @EnvironmentObject private var auditLog: AuditLog
 
     var body: some View {
         List {
-            Section(header: Text("Recent Activity")) {
-                // Your AuditLog currently does not expose in-memory entries; placeholder for now
+            Section {
                 if auditLog.networkLogs.isEmpty {
-                    Text("No audit records available")
-                        .foregroundColor(.secondary)
+                    Text("No audit records available").foregroundColor(.secondary)
                 } else {
                     ForEach(auditLog.networkLogs) { log in
                         VStack(alignment: .leading, spacing: 4) {
@@ -162,10 +164,15 @@ struct NetworkAuditView: View {
                         }
                     }
                 }
+            } header: {
+                Text("Recent Activity")
             }
-            Section(header: Text("Actions")) {
+
+            Section {
                 Button("Clear Audit Log") { auditLog.clearLogs() }
                     .foregroundColor(.red)
+            } header: {
+                Text("Actions")
             }
         }
         .navigationTitle("Network Audit")
@@ -173,7 +180,7 @@ struct NetworkAuditView: View {
     }
 }
 
-// MARK: - Prompt Templates (uses PromptTemplateManager API)
+// MARK: - Prompt Templates
 struct PromptTemplatesView: View {
     @StateObject private var manager = PromptTemplateManager.shared
     @State private var showAddSheet = false
@@ -181,7 +188,7 @@ struct PromptTemplatesView: View {
 
     var body: some View {
         List {
-            Section(header: Text("Templates")) {
+            Section {
                 if manager.templates.isEmpty {
                     Text("No templates yet").foregroundColor(.secondary)
                 } else {
@@ -207,15 +214,18 @@ struct PromptTemplatesView: View {
                             }
                         }
                     }
-                    .onDelete { offsets in
-                        manager.remove(atOffsets: offsets)
-                    }
+                    .onDelete { offsets in manager.remove(atOffsets: offsets) }
                 }
+            } header: {
+                Text("Templates")
             }
-            Section(header: Text("Actions")) {
+
+            Section {
                 Button("Add Template") { showAddSheet = true }
                 Button("Import Templates") { showImporter = true }
                 Button("Export Templates") { manager.exportTemplates() }
+            } header: {
+                Text("Actions")
             }
         }
         .navigationTitle("Prompt Templates")
@@ -243,9 +253,7 @@ struct AddTemplateView: View {
             Form {
                 TextField("Name", text: $name)
                 Picker("Category", selection: $category) {
-                    ForEach(categories, id: \.self) { c in
-                        Text(c)
-                    }
+                    ForEach(categories, id: \.self) { c in Text(c) }
                 }
                 VStack(alignment: .leading) {
                     Text("Content").font(.headline)
@@ -273,7 +281,7 @@ struct AddTemplateView: View {
     }
 }
 
-// MARK: - SQL Assistant (local validator/executor placeholder)
+// MARK: - SQL Assistant
 struct SQLHelperView: View {
     @State private var query = ""
     @State private var result = ""
@@ -281,11 +289,14 @@ struct SQLHelperView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("SQL Query")) {
+            Section {
                 TextEditor(text: $query)
                     .frame(minHeight: 100)
                     .font(.system(.body, design: .monospaced))
+            } header: {
+                Text("SQL Query")
             }
+
             Section {
                 HStack {
                     Button("Validate") { validateSQL() }
@@ -294,7 +305,8 @@ struct SQLHelperView: View {
                         .buttonStyle(.borderedProminent)
                 }
             }
-            Section(header: Text("Results")) {
+
+            Section {
                 if errorMessage.isEmpty {
                     ScrollView {
                         Text(result)
@@ -305,6 +317,8 @@ struct SQLHelperView: View {
                 } else {
                     Text(errorMessage).foregroundColor(.red)
                 }
+            } header: {
+                Text("Results")
             }
         }
         .navigationTitle("SQL Assistant")
@@ -313,25 +327,14 @@ struct SQLHelperView: View {
 
     private func validateSQL() {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            errorMessage = "Query is empty."
-            result = ""
-            return
-        }
+        guard !trimmed.isEmpty else { errorMessage = "Query is empty."; result = ""; return }
         let verbs = ["select", "update", "insert", "delete", "create", "drop", "alter"]
         let lower = trimmed.lowercased()
-        guard trimmed.hasSuffix(";") else {
-            errorMessage = "Query should end with a semicolon."
-            result = ""
-            return
-        }
+        guard trimmed.hasSuffix(";") else { errorMessage = "Query should end with a semicolon."; result = ""; return }
         guard verbs.contains(where: { lower.contains($0) }) else {
-            errorMessage = "Query does not include a recognized SQL verb."
-            result = ""
-            return
+            errorMessage = "Query does not include a recognized SQL verb."; result = ""; return
         }
-        errorMessage = ""
-        result = "Validation OK."
+        errorMessage = ""; result = "Validation OK."
     }
 
     private func executeSQL() {
@@ -351,7 +354,7 @@ struct SQLHelperView: View {
     }
 }
 
-// MARK: - Code Linter (basic checks + formatter)
+// MARK: - Code Linter
 struct CodeLinterView: View {
     @State private var code = ""
     @State private var lintResults: [String] = []
@@ -360,19 +363,23 @@ struct CodeLinterView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("Language")) {
+            Section {
                 Picker("Language", selection: $language) {
-                    ForEach(languages, id: \.self) { lang in
-                        Text(lang)
-                    }
+                    ForEach(languages, id: \.self) { lang in Text(lang) }
                 }
                 .pickerStyle(.menu)
+            } header: {
+                Text("Language")
             }
-            Section(header: Text("Code")) {
+
+            Section {
                 TextEditor(text: $code)
                     .frame(minHeight: 200)
                     .font(.system(.body, design: .monospaced))
+            } header: {
+                Text("Code")
             }
+
             Section {
                 HStack {
                     Button("Lint") { lint() }
@@ -381,14 +388,15 @@ struct CodeLinterView: View {
                         .buttonStyle(.bordered)
                 }
             }
-            Section(header: Text("Results")) {
+
+            Section {
                 if lintResults.isEmpty {
                     Text("No results yet").foregroundColor(.secondary)
                 } else {
-                    ForEach(lintResults, id: \.self) { issue in
-                        Text(issue)
-                    }
+                    ForEach(lintResults, id: \.self) { issue in Text(issue) }
                 }
+            } header: {
+                Text("Results")
             }
         }
         .navigationTitle("Code Linter")
@@ -399,12 +407,8 @@ struct CodeLinterView: View {
         var issues: [String] = []
         let lines = code.components(separatedBy: .newlines)
         for (i, line) in lines.enumerated() {
-            if line.count > 120 {
-                issues.append("Line \(i+1): Line exceeds 120 characters.")
-            }
-            if line.hasSuffix(" ") {
-                issues.append("Line \(i+1): Trailing whitespace.")
-            }
+            if line.count > 120 { issues.append("Line \(i+1): Line exceeds 120 characters.") }
+            if line.hasSuffix(" ") { issues.append("Line \(i+1): Trailing whitespace.") }
         }
         if language == "Swift" && !code.contains("{") {
             issues.append("Swift: Consider adding braces for blocks if missing.")
@@ -413,20 +417,20 @@ struct CodeLinterView: View {
     }
 
     private func format(code: String, language: String) -> String {
-        // Simple formatter: strip trailing spaces, ensure EOF newline
+        // Strip trailing spaces and ensure newline at EOF
         let lines = code.components(separatedBy: .newlines)
-        let trimmedLines = lines.map { line in
+        let trimmed = lines.map { line in
             var s = line
             while s.last == " " || s.last == "\t" { _ = s.popLast() }
             return s
         }
-        var joined = trimmedLines.joined(separator: "\n")
+        var joined = trimmed.joined(separator: "\n")
         if !joined.hasSuffix("\n") { joined.append("\n") }
         return joined
     }
 }
 
-// MARK: - Add Knowledge (local importer + simulated processing)
+// MARK: - Add Knowledge
 struct AddKnowledgeView: View {
     @State private var selectedFiles: [URL] = []
     @State private var isProcessing = false
@@ -509,7 +513,7 @@ struct AddKnowledgeView: View {
         processedCount = 0
         Task {
             for _ in selectedFiles {
-                try? await Task.sleep(nanoseconds: 300_000_000) // simulate 0.3s
+                try? await Task.sleep(nanoseconds: 300_000_000)
                 processedCount += 1
             }
             isProcessing = false
@@ -517,7 +521,7 @@ struct AddKnowledgeView: View {
     }
 }
 
-// MARK: - Embeddings Dashboard (uses your EmbeddingsManager API)
+// MARK: - Embeddings Dashboard (EmbeddingsManager-aligned)
 struct EmbeddingsDashboardView: View {
     @EnvironmentObject private var embeddingsManager: EmbeddingsManager
 
@@ -532,7 +536,7 @@ struct EmbeddingsDashboardView: View {
 
     var body: some View {
         List {
-            Section(header: Text("Overview")) {
+            Section {
                 HStack {
                     Label("Total", systemImage: "number")
                     Spacer()
@@ -557,16 +561,17 @@ struct EmbeddingsDashboardView: View {
                     Text(relativeLastUpdated)
                         .foregroundColor(.secondary)
                 }
+            } header: {
+                Text("Overview")
             }
 
-            Section(header: Text("Sources")) {
+            Section {
                 if embeddingsManager.knowledgeSources.isEmpty {
                     Text("No sources yet").foregroundColor(.secondary)
                 } else {
                     ForEach(embeddingsManager.knowledgeSources) { source in
                         HStack(spacing: 12) {
-                            Image(systemName: source.icon)
-                                .foregroundColor(.blue)
+                            Image(systemName: source.icon).foregroundColor(.blue)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(source.name).font(.headline)
                                 Text("\(source.embeddingCount) embeddings • updated \(source.lastUpdated.formatted(date: .abbreviated, time: .shortened))")
@@ -578,14 +583,10 @@ struct EmbeddingsDashboardView: View {
                                 ProgressView().scaleEffect(0.8)
                             } else {
                                 Menu {
-                                    Button("Rebuild") {
-                                        embeddingsManager.rebuildSource(source)
-                                    }
+                                    Button("Rebuild") { embeddingsManager.rebuildSource(source) }
                                     Button(role: .destructive) {
                                         embeddingsManager.deleteSource(source)
-                                    } label: {
-                                        Text("Delete")
-                                    }
+                                    } label: { Text("Delete") }
                                 } label: {
                                     Image(systemName: "ellipsis.circle")
                                 }
@@ -594,31 +595,27 @@ struct EmbeddingsDashboardView: View {
                         .padding(.vertical, 2)
                     }
                 }
+            } header: {
+                Text("Sources")
             }
 
-            Section(header: Text("Actions")) {
+            Section {
                 if embeddingsManager.isRebuilding {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Rebuilding all embeddings…")
                         ProgressView(value: embeddingsManager.rebuildProgress)
                     }
                 } else {
-                    Button("Refresh Data") {
-                        embeddingsManager.refreshData()
-                    }
-                    Button("Rebuild All Embeddings") {
-                        embeddingsManager.rebuildAllEmbeddings()
-                    }
-                    Button("Export Embeddings") {
-                        embeddingsManager.exportEmbeddings()
-                    }
-                    Button("Import Embeddings") {
-                        embeddingsManager.importEmbeddings()
-                    }
+                    Button("Refresh Data") { embeddingsManager.refreshData() }
+                    Button("Rebuild All Embeddings") { embeddingsManager.rebuildAllEmbeddings() }
+                    Button("Export Embeddings") { embeddingsManager.exportEmbeddings() }
+                    Button("Import Embeddings") { embeddingsManager.importEmbeddings() }
                     Button("Clear All Embeddings", role: .destructive) {
                         embeddingsManager.clearAllEmbeddings()
                     }
                 }
+            } header: {
+                Text("Actions")
             }
         }
         .navigationTitle("Manage Embeddings")
