@@ -1,7 +1,4 @@
-# Jarvis/project.yml
-# Spec lives inside the Jarvis/ folder.
-# It compiles EVERY Swift file under Sources/AppModule (App, Chat, Models, Privacy, services, Settings, Vision, Voice),
-# links the local Swift package product AppModule, and expects an Info.plist next to JarvisApp.swift.
+# Jarvis/project.yml — spec and Package.swift both live inside Jarvis/
 
 name: Jarvis
 options:
@@ -14,9 +11,9 @@ settings:
   IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 
 packages:
-  # Local Swift package with Package.swift at repo root (one level up from Jarvis/)
+  # Local Swift package is in the SAME folder as this spec
   appmodule-local:
-    path: ..
+    path: .
 
 targets:
   Jarvis:
@@ -24,17 +21,13 @@ targets:
     platform: iOS
     deploymentTarget: "17.0"
 
-    # Include all source code under Sources/AppModule (recursively)
-    # and also add explicit groups for the subfolders shown in your screenshots.
+    # Include all code under Sources/AppModule (recursively)
     sources:
-      # Catch‑all include
       - path: Sources/AppModule
         name: AppModuleAll
         excludes:
           - "../Scripts/**"
           - "**/*.md"
-
-      # Explicit subfolders for cleaner grouping in Xcode’s navigator
       - path: Sources/AppModule/App
         name: App
       - path: Sources/AppModule/Chat
@@ -59,25 +52,8 @@ targets:
       TARGETED_DEVICE_FAMILY: "1,2"
       SWIFT_VERSION: 5.0
       ENABLE_PREVIEWS: YES
-
-      # Place this file alongside JarvisApp.swift (create it if missing)
       INFOPLIST_FILE: Sources/AppModule/App/Info.plist
-
-      # If you later add entitlements:
       # CODE_SIGN_ENTITLEMENTS: Sources/AppModule/App/Jarvis.entitlements
-
-      # If you later link prebuilt libs, uncomment and customize:
-      # LIBRARY_SEARCH_PATHS:
-      #   - "$(inherited)"
-      #   - "$(PROJECT_DIR)/dist/lib"
-      # OTHER_LDFLAGS:
-      #   - "-Wl,-all_load"
-      #   - "-lmodel_iphone"
-      #   - "-lmlc_llm"
-      #   - "-ltvm_runtime"
-      #   - "-ltokenizers_cpp"
-      #   - "-lsentencepiece"
-      #   - "-ltokenizers_c"
 
     dependencies:
       - package: appmodule-local
