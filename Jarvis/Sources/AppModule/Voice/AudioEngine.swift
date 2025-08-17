@@ -1,40 +1,31 @@
 import Foundation
 import os.log
 import AVFoundation
-#if os(iOS)
 import Speech
-#endif
 
 @MainActor
-class AudioEngine: NSObject, ObservableObject {
+final class AudioEngine: NSObject, ObservableObject {
     @Published var isRecording = false
     @Published var transcriptionText = ""
 
-    #if os(iOS)
     private let audioEngine = AVAudioEngine()
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale.current)
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let speechSynthesizer = AVSpeechSynthesizer()
-    #endif
 
     private let logger = Logger(subsystem: "com.jarvis.voice", category: "audio")
 
     override init() {
         super.init()
-        #if os(iOS)
         speechSynthesizer.delegate = self
         SFSpeechRecognizer.requestAuthorization { status in
-            switch status {
-            case .authorized: break
-            default:
+            if case .authorized = status { } else {
                 self.logger.warning("Speech recognition not authorized: \(status.rawValue)")
             }
         }
-        #endif
     }
 
-    #if os(iOS)
     func startRecording(completion: @escaping (String) -> Void) {
         guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             logger.warning("Speech recognizer unavailable")
@@ -43,14 +34,14 @@ class AudioEngine: NSObject, ObservableObject {
 
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let request = recognitionRequest else { return }
-
         let inputNode = audioEngine.inputNode
         request.shouldReportPartialResults = true
 
-        recognitionTask = recognizer.recognitionTask(with: request) { result, error in
+        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            guard let self = self else { return }
             if let result = result {
                 let text = result.bestTranscription.formattedString
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.transcriptionText = text
                     completion(text)
                 }
@@ -61,9 +52,11 @@ class AudioEngine: NSObject, ObservableObject {
             }
         }
 
+        }
+
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            request.append(buffer)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
         }
 
         audioEngine.prepare()
@@ -94,24 +87,6 @@ class AudioEngine: NSObject, ObservableObject {
         speechSynthesizer.stopSpeaking(at: .immediate)
         logger.info("Stopped speaking")
     }
-    #else
-    func startRecording(completion: @escaping (String) -> Void) {
-        logger.warning("Speech unavailable")
-    }
-    func stopRecording() {
-        logger.warning("Speech unavailable")
-    }
-    func speak(text: String) {
-        logger.warning("Speech unavailable")
-    }
-    func stopSpeaking() {
-        logger.warning("Speech unavailable")
-    }
-    #endif
 }
 
-#if os(iOS)
-extension AudioEngine: AVSpeechSynthesizerDelegate {
-    // Add methods if you need callbacks for start/finish of speech
-}
-#endif
+extension AudioEngine: AVSpeechSynthesizerDelegate {}

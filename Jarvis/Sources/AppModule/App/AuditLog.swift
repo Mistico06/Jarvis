@@ -2,9 +2,8 @@ import Foundation
 import os.log
 
 @MainActor
-class AuditLog: ObservableObject {
+final class AuditLog: ObservableObject {
     static let shared = AuditLog()
-
     private let logger = Logger(subsystem: "com.jarvis.audit", category: "log")
 
     private init() {}
@@ -22,11 +21,10 @@ class AuditLog: ObservableObject {
         // TODO: Clear persisted logs if you store them
     }
 
-    // Optional: expose logs for UI. For now, return empty to compile.
+    // Expose records if you later store them
     var networkLogs: [NetworkLog] { [] }
 }
 
-// Optional: Only include this if not defined elsewhere.
 struct NetworkLog: Identifiable {
     let id = UUID()
     let host: String

@@ -15,9 +15,9 @@ struct Message: Identifiable, Codable, Equatable {
     }
 }
 
+@MainActor
 final class ConversationStore: ObservableObject {
     static let shared = ConversationStore()
-
     @Published private(set) var messages: [Message] = []
 
     private init() {}
@@ -31,7 +31,5 @@ final class ConversationStore: ObservableObject {
     }
 
     // SettingsView calls clearAll()
-    func clearAll() {
-        clear()
-    }
+    func clearAll() { clear() }
 }

@@ -3,11 +3,14 @@ import Network
 import os.log
 
 @MainActor
-class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
+final class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
     static let shared = NetworkGuard()
 
+    // Published state
     @Published var isNetworkAllowed = false
+    @Published private(set) var currentMode: NetworkMode = .offline
 
+    // Modes that govern whether network is permitted
     enum NetworkMode {
         case offline
         case quickSearch
@@ -15,8 +18,7 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         case voiceControl
     }
 
-    @Published private(set) var currentMode: NetworkMode = .offline
-
+    // Internals
     private let monitor = NWPathMonitor()
     private let logger = Logger(subsystem: "com.jarvis.network", category: "guard")
     private var activeRequests: Set<String> = []
@@ -26,9 +28,11 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         setupNetworkMonitoring()
     }
 
+    // MARK: - Monitoring
+
     private func setupNetworkMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
-            guard let self else { return }
+            guard let self = self else { return }
             Task { @MainActor in
                 self.isNetworkAllowed = (path.status == .satisfied)
                 let status = path.status == .satisfied ? "available" : "unavailable"
@@ -39,9 +43,10 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         monitor.start(queue: queue)
     }
 
+
     // MARK: - Mode handling
 
-    // UI passes AppState.AppMode. We map internally.
+    /// UI provides AppState.AppMode; map it internally.
     func setNetworkMode(_ mode: AppState.AppMode) {
         let mapped: NetworkMode
         switch mode {
@@ -50,7 +55,6 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         case .deepResearch: mapped = .deepResearch
         case .voiceControl: mapped = .voiceControl
         }
-
         currentMode = mapped
         logger.info("Network mode changed to: \(String(describing: mapped))")
 
@@ -64,6 +68,7 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
 
     // MARK: - Request gating
 
+    /// Returns true if networking is allowed for this purpose.
     func requestNetworkAccess(for purpose: String) -> Bool {
         guard isNetworkAllowed else {
             logger.warning("Network access denied for: \(purpose)")
@@ -84,55 +89,19 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         logger.info("Released network access for: \(purpose)")
     }
 
-    var hasActiveNetworkRequests: Bool {
-        !activeRequests.isEmpty
-    }
+    var hasActiveNetworkRequests: Bool { !activeRequests.isEmpty }
 
-    // MARK: - URLSessionDelegate (signatures aligned with SDK)
+    // MARK: - Basic request validation
 
-    // Session-level challenge (e.g., TLS)
-    func urlSession(_ session: URLSession,
-                    didReceive challenge: URLAuthenticationChallenge,
-                    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        completionHandler(.performDefaultHandling, nil)
-    }
-
-    // Task-level challenge
-    func urlSession(_ session: URLSession,
-                    task: URLSessionTask,
-                    didReceive challenge: URLAuthenticationChallenge,
-                    completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        let host = task.originalRequest?.url?.host ?? "unknown"
-        guard requestNetworkAccess(for: host) else {
-            logger.warning("Network access denied for host: \(host)")
-            completionHandler(.cancelAuthenticationChallenge, nil)
-            return
-        }
-        completionHandler(.performDefaultHandling, nil)
-    }
-
-    // Task completion
-    func urlSession(_ session: URLSession,
-                    task: URLSessionTask,
-                    didCompleteWithError error: Error?) {
-        if let error {
-            logger.error("Network request completed with error: \(error.localizedDescription)")
-        }
-        releaseNetworkAccess()
-    }
-
-    // MARK: - Request validation
-
+    /// Very simple allowlist. Expand to your needs.
     func validateRequest(_ request: URLRequest) -> Bool {
         guard let url = request.url, let host = url.host else { return false }
-
         let allowedHosts = [
             "api.openai.com",
             "api.anthropic.com",
             "api.together.xyz",
             "huggingface.co"
         ]
-
         let isAllowed = allowedHosts.contains { host.hasSuffix($0) }
         if !isAllowed {
             logger.warning("Request to unauthorized host blocked: \(host)")
@@ -140,7 +109,7 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         return isAllowed
     }
 
-    // MARK: - URLSession factory
+    // MARK: - URLSession
 
     func createSecureURLSession() -> URLSession {
         let configuration = URLSessionConfiguration.default
@@ -148,15 +117,42 @@ class NetworkGuard: NSObject, ObservableObject, URLSessionDelegate {
         configuration.timeoutIntervalForResource = 60.0
         return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }
+
+    // MARK: - URLSessionDelegate (Swift 6-safe: nonisolated)
+
+    nonisolated func urlSession(_ session: URLSession,
+                                didReceive challenge: URLAuthenticationChallenge,
+                                completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        completionHandler(.performDefaultHandling, nil)
+    }
+
+    nonisolated func urlSession(_ session: URLSession,
+                                task: URLSessionTask,
+                                didReceive challenge: URLAuthenticationChallenge,
+                                completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        completionHandler(.performDefaultHandling, nil)
+    }
+
+    nonisolated func urlSession(_ session: URLSession,
+                                task: URLSessionTask,
+                                didCompleteWithError error: Error?) {
+        if let error {
+            Logger(subsystem: "com.jarvis.network", category: "guard")
+                .error("Network request completed with error: \(error.localizedDescription)")
+        }
+        // Release access on completion
+        Task { @MainActor in
+            NetworkGuard.shared.releaseNetworkAccess()
+        }
+    }
 }
 
-// MARK: - Pretty description
-
+// Pretty description for UI logs
 extension NetworkGuard.NetworkMode: CustomStringConvertible {
     var description: String {
         switch self {
-        case .offline:      return "Offline"
-        case .quickSearch:  return "Quick Search"
+        case .offline: return "Offline"
+        case .quickSearch: return "Quick Search"
         case .deepResearch: return "Deep Research"
         case .voiceControl: return "Voice Control"
         }

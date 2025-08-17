@@ -8,9 +8,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                // ✅ Simplified since you only target iOS
-                Color(.systemBackground)
-                    .ignoresSafeArea()
+                Color(.systemBackground).ignoresSafeArea()
 
                 // Main chat interface
                 ChatView()
@@ -19,8 +17,7 @@ struct ContentView: View {
                 // Network indicator
                 if appState.currentMode != .offline {
                     HStack(spacing: 8) {
-                        Image(systemName: "wifi")
-                            .foregroundColor(.orange)
+                        Image(systemName: "wifi").foregroundColor(.orange)
                         Text("Network Active")
                             .font(.caption)
                             .foregroundColor(.orange)
@@ -36,16 +33,12 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
+                    Button { showingSettings = true } label: {
                         Image(systemName: "gearshape")
                     }
                 }
             }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
-            }
+            .sheet(isPresented: $showingSettings) { SettingsView() }
         }
     }
 }
