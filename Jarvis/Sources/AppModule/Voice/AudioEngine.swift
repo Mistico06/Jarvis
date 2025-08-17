@@ -20,7 +20,9 @@ final class AudioEngine: NSObject, ObservableObject {
         super.init()
         speechSynthesizer.delegate = self
         SFSpeechRecognizer.requestAuthorization { status in
-            if case .authorized = status { } else {
+            if case .authorized = status {
+                // ok
+            } else {
                 self.logger.warning("Speech recognition not authorized: \(status.rawValue)")
             }
         }
@@ -34,6 +36,7 @@ final class AudioEngine: NSObject, ObservableObject {
 
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let request = recognitionRequest else { return }
+
         let inputNode = audioEngine.inputNode
         request.shouldReportPartialResults = true
 
@@ -50,8 +53,6 @@ final class AudioEngine: NSObject, ObservableObject {
                 self.logger.error("Recognition error: \(error.localizedDescription)")
                 self.stopRecording()
             }
-        }
-
         }
 
         let recordingFormat = inputNode.outputFormat(forBus: 0)
@@ -73,6 +74,7 @@ final class AudioEngine: NSObject, ObservableObject {
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.stop()
         recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
         isRecording = false
         logger.info("Stopped recording")
     }
