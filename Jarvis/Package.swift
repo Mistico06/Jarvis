@@ -5,7 +5,7 @@ let package = Package(
     name: "Jarvis",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v18)
+        .iOS(.version("18.0"))
     ],
     products: [
         .library(
