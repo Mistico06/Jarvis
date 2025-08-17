@@ -6,7 +6,7 @@ options:
 
 settings:
   BASE_SDK: iphoneos
-  IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+  IPHONEOS_DEPLOYMENT_TARGET: "18.0"   # set "17.0" if you want iOS 17 support
 
 packages:
   appmodule-local:
@@ -16,14 +16,18 @@ targets:
   Jarvis:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "18.0"            # set "17.0" if you want iOS 17 support
 
+    # Order matters: we include the whole AppModule tree, but explicitly
+    # exclude the entry point there so it isn't picked twice.
+    # The specific "App" path then adds JarvisApp.swift for the app target.
     sources:
       - path: Sources/AppModule
         name: AppModuleAll
         excludes:
           - "../Scripts/**"
           - "**/*.md"
+          - "App/JarvisApp.swift"       # avoid duplicate _main via umbrella path
       - path: Sources/AppModule/App
         name: App
       - path: Sources/AppModule/Chat

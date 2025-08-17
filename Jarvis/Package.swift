@@ -5,7 +5,7 @@ let package = Package(
     name: "Jarvis",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v17) // Raised deployment target to iOS 17
+        .iOS(.v18)
     ],
     products: [
         .library(
@@ -15,11 +15,8 @@ let package = Package(
         )
     ],
     dependencies: [
-        // MLC LLM runtime
         .package(url: "https://github.com/Mistico06/mlc-llm.git", branch: "main"),
-        // Crypto primitives
         .package(url: "https://github.com/apple/swift-crypto.git", from: "2.0.0"),
-        // SQLite wrapper
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.13.0")
     ],
     targets: [
@@ -30,7 +27,11 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "SQLite", package: "SQLite.swift")
             ],
-            path: "Sources/AppModule" // Ensure this matches your folder layout
+            path: "Sources/AppModule",
+            // Exclude the app's entry point so the library doesn't define _main.
+            exclude: [
+                "App/JarvisApp.swift"
+            ]
         )
     ]
 )
