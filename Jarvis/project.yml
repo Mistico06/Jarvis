@@ -6,7 +6,7 @@ options:
 
 settings:
   BASE_SDK: iphoneos
-  IPHONEOS_DEPLOYMENT_TARGET: "18.0"   # set "17.0" if you want iOS 17 support
+  IPHONEOS_DEPLOYMENT_TARGET: "17.0"   # set "17.0" if you want iOS 17 support
 
 packages:
   appmodule-local:
